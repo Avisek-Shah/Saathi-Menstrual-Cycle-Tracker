@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Saathi",
+    "slug": "saathi",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourname.saathi"
+    },
+    "android": {
+      "package": "com.yourname.saathi",
+      "versionCode": 1,
+      "permissions": ["POST_NOTIFICATIONS"],
+      "adaptiveIcon": {
+        "backgroundColor": "#E8637C",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/630bb785-914e-4ac9-be71-36e44c50a2d2"
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "630bb785-914e-4ac9-be71-36e44c50a2d2"
+      }
+    }
+  }
+}
