@@ -1,15 +1,20 @@
 {
   "expo": {
     "name": "Saathi",
-    "slug": "saathi",
+    "slug": "avishekshah",
     "scheme": "saathi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "platforms": ["android", "ios"],
-    "plugins": ["expo-router"],
+    "platforms": [
+      "android",
+      "ios"
+    ],
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.yourname.saathi"
@@ -17,7 +22,9 @@
     "android": {
       "package": "com.yourname.saathi",
       "versionCode": 1,
-      "permissions": ["POST_NOTIFICATIONS"],
+      "permissions": [
+        "POST_NOTIFICATIONS"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E8637C",
         "foregroundImage": "./assets/android-icon-foreground.png",

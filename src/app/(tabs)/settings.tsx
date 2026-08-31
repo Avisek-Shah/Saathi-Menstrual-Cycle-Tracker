@@ -20,8 +20,8 @@ export default function SettingsScreen() {
       />
       <Row
         label={en.settingsNotifications}
-        value={settings.notifications_enabled ? 'On' : 'Off'}
-        onPress={() => update({ notifications_enabled: !(settings.notifications_enabled ?? false) })}
+        value={settings.notif_period_soon ? 'On' : 'Off'}
+        onPress={() => update({ notif_period_soon: !settings.notif_period_soon })}
       />
     </ScrollView>
   );
