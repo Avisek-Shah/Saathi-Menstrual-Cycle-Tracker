@@ -1,6 +1,7 @@
 import { Text, View } from 'react-native';
 
 import { colors } from '../../theme/colors';
+import { elevation } from '../../theme/elevation';
 import { radius, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
@@ -25,6 +26,7 @@ export function StatusCard({ headline, dateLine, cycleDayLabel, confidenceLabel 
         paddingVertical: spacing.xl,
         paddingHorizontal: spacing.lg,
         gap: spacing.sm,
+        ...elevation.raised,
       }}
     >
       <Text style={{ ...typography.hero, color: colors.primary }}>{headline}</Text>

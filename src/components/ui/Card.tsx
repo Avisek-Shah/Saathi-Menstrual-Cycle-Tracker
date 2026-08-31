@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { View, type ViewStyle } from 'react-native';
 
 import { colors } from '../../theme/colors';
+import { elevation } from '../../theme/elevation';
 import { radius, spacing } from '../../theme/spacing';
 
 interface CardProps {
@@ -21,6 +22,7 @@ export function Card({ children, muted = false, style }: CardProps) {
         borderColor: colors.border,
         padding: spacing.lg,
         opacity: muted ? 0.6 : 1,
+        ...elevation.card,
         ...style,
       }}
     >

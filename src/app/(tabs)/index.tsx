@@ -1,8 +1,9 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { AppState, ScrollView, View } from 'react-native';
+import { AppState } from 'react-native';
 
 import { formatDate } from '../../core/calendar';
+import type { Symptom } from '../../core/enums';
 import {
   cycleDay,
   currentPeriod,
@@ -11,19 +12,26 @@ import {
   primaryAction,
 } from '../../core/home';
 import { lateState } from '../../core/prediction';
+import { applyQuickToggle, quickLogOptions, rankRecentSymptoms, type LogSnapshot } from '../../core/quickLog';
 import { IrregularNoticeCard } from '../../components/cycle/IrregularNoticeCard';
 import { FertileCard } from '../../components/cycle/FertileCard';
 import { LogSummary } from '../../components/cycle/LogSummary';
+import { QuickLog } from '../../components/cycle/QuickLog';
 import { RecalcCard } from '../../components/cycle/RecalcCard';
 import { StatusCard } from '../../components/cycle/StatusCard';
 import { WeekStrip } from '../../components/cycle/WeekStrip';
 import { Button } from '../../components/ui/Button';
+import { Screen } from '../../components/ui/Screen';
+import * as dailyLogs from '../../db/repositories/dailyLogs';
 import { en, fill } from '../../i18n/en';
 import { todayIso } from '../../services/clock';
 import { useCycleStore } from '../../stores/useCycleStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
-import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
+
+// SPEC: 2026-08-31 — §6.2 says the quick-log row offers "the user's most-used recent
+// symptoms" without a sample size. 30 days is roughly one full cycle, which is the natural
+// window for "recent" here. See DECISIONS.md.
+const RECENT_LOG_SAMPLE = 30;
 
 export default function Home() {
   const router = useRouter();
@@ -33,6 +41,7 @@ export default function Home() {
 
   const [today, setToday] = useState(todayIso());
   const [recalcDismissed, setRecalcDismissed] = useState(false);
+  const [recentSymptoms, setRecentSymptoms] = useState<Symptom[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -60,8 +69,21 @@ export default function Home() {
     }
   }, [prediction, settings.irregular_notice_seen, updateSettings]);
 
+  // §6.2 quick-log row — most-used recent symptoms, refreshed whenever Home regains focus.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      void dailyLogs.getRecent(RECENT_LOG_SAMPLE, today).then((rows) => {
+        if (!cancelled) setRecentSymptoms(rankRecentSymptoms(rows as { symptoms: Symptom[] }[]));
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, [today]),
+  );
+
   if (!ready || !prediction) {
-    return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+    return <Screen />;
   }
 
   const anchor = lastPeriodStartOnOrBefore(periods, today);
@@ -110,11 +132,25 @@ export default function Home() {
   const showIrregularNotice = prediction.isIrregular && !settings.irregular_notice_seen;
   const showRecalc = late.status === 'offerRecalculate' && !recalcDismissed;
 
+  // §6.2 — the quick-log row merges into whatever is already logged today; it never opens a modal.
+  const todaySnapshot: LogSnapshot = {
+    flow: (todayLog?.flow as LogSnapshot['flow']) ?? 'none',
+    moods: todayLog?.moods ?? [],
+    symptoms: (todayLog?.symptoms as Symptom[]) ?? [],
+    note: todayLog?.note ?? null,
+  };
+  const quickOptions = quickLogOptions({
+    log: todaySnapshot,
+    onPeriod: onPeriod !== null,
+    recentSymptoms,
+  });
+  const onQuickToggle: Parameters<typeof QuickLog>[0]['onToggle'] = (option) => {
+    const merged = applyQuickToggle(todaySnapshot, option);
+    void saveLog(today, merged.flow, merged.moods, merged.symptoms, merged.note, today);
+  };
+
   return (
-    <ScrollView
-      style={{ backgroundColor: colors.bg }}
-      contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
-    >
+    <Screen bottomInset gap={16}>
       {showIrregularNotice ? (
         <IrregularNoticeCard onDismiss={() => void updateSettings({ irregular_notice_seen: true })} />
       ) : null}
@@ -140,6 +176,10 @@ export default function Home() {
         onPress={onPrimary}
       />
 
+      {settings.quick_log_enabled ? (
+        <QuickLog options={quickOptions} onToggle={onQuickToggle} />
+      ) : null}
+
       <WeekStrip
         today={today}
         periods={periods}
@@ -151,6 +191,6 @@ export default function Home() {
       <FertileCard prediction={prediction} calendarSystem={settings.calendar_system} today={today} />
 
       <LogSummary log={todayLog} onEdit={() => router.push(`/log/${today}`)} />
-    </ScrollView>
+    </Screen>
   );
 }

@@ -12,10 +12,11 @@ Solo developer + AI agent → private APK distribution to a small group.
 | **B. Core loop** | M3–M4 | 3–4 | Onboarding + Home + logging — the app is usable |
 | **C. Full surface** | M5–M7 | 4–5 | Calendar, Insights, Settings, notifications, PIN |
 | **D. Polish** | M8–M9 | 2–3 | Learn content, edge cases, accessibility |
+| **D2. UX pass** | M10 | 2–3 | The app is comfortable on a real phone: safe areas, typed input, editable profile, interactive calendar, readable journal |
 | **E. Release** | R1–R3 | 1–2 | Signed APK, install guide, delivered to the group |
 | **F. Live** | ongoing | — | Feedback, OTA fixes, v1.1 |
 
-**Total: 13–18 focused days.** At 2–3 hours an evening that's roughly 5–7 weeks; over full weekends, 3–4 weeks. The estimate assumes an AI agent writing most of the code and you reviewing every diff — it does *not* assume the agent gets it right first try.
+**Total: 15–21 focused days.** At 2–3 hours an evening that's roughly 5–7 weeks; over full weekends, 3–4 weeks. The estimate assumes an AI agent writing most of the code and you reviewing every diff — it does *not* assume the agent gets it right first try.
 
 The biggest schedule risk is Phase A. Rushing the prediction engine means paying for it in every later phase with bugs that look like UI bugs but aren't.
 
@@ -178,6 +179,80 @@ Work through REQUIREMENTS §10 as an explicit checklist, one commit per case. Th
 - [ ] Timezone change test: set device to a different zone, reopen, verify no date shift
 - [ ] Grep the bundle for network calls
 - [ ] Performance: 500 seeded log rows, calendar swipe stays smooth
+
+---
+
+## 6b. Phase D2 — UX pass
+
+### Carried over — read this before starting M10
+
+As of 2026-08-31 the repository does **not** contain everything the milestones above claim. Verified against the tree:
+
+| Milestone | Claimed | Actually in the repo |
+|---|---|---|
+| M6 Insights | stats, three charts, cycle history | two stat rows; `src/components/charts/` is empty; no history list |
+| M7 Settings, notifications, PIN, export | complete | `src/services/` holds only `clock.ts`; no `notifications.ts`, `lock.ts`, `export.ts`, no `app/lock.tsx`; settings screen is a two-row stub |
+| M8 Learn | six articles | `src/content/learn/article-5.md` only; no `app/learn/` route |
+
+M10 does not build those. They stay owned by M6, M7, and M8 and must be finished before release — §15 acceptance depends on notifications, the PIN, delete-all, and the charts. Settings rows for the unbuilt features render in a visibly disabled state rather than pretending to work.
+
+### M10 — UX pass (2–3 days)
+
+Spec: §6.1, §6.2, §6.3, §6.3.1, §6.4, §6.5, §6.7, §10.10–13, §11.6, §11.7. **No new dependency** — everything needed is already installed.
+
+**Step 1 — safe areas (do first; it is the blocking bug)**
+
+- [ ] `SafeAreaProvider` + `GestureHandlerRootView` + `StatusBar` in the root layout
+- [ ] One `Screen` wrapper component applying insets; every tab, the modal, and onboarding go through it
+- [ ] Tab bar height includes `insets.bottom`
+- [ ] Onboarding footer clears the gesture bar; controls ≥ 48px; Next responds on the first tap on a gesture-nav phone
+
+**Step 2 — onboarding input**
+
+- [ ] Pure helpers in `core/onboarding.ts`: numeric input parsing, quick date choices, quick length choices — with tests
+- [ ] `TextField` and `DatePickerGrid` components; the grid reuses `getMonthGrid`
+- [ ] Every answer step offers chips **and** a typed field, with inline validation
+- [ ] `onboarding_seed_range` written on finish
+
+**Step 3 — editable profile**
+
+- [ ] Settings → My cycle screen editing all onboarding answers
+- [ ] Pure `reseedPlan` + repository `clearFlowForRange`, with tests for the protected-day rule
+- [ ] Anchor change confirms first, then recomputes; no user-logged day is destroyed
+- [ ] Settings rebuilt into grouped sections; unbuilt M7 rows shown disabled
+
+**Step 4 — calendar**
+
+- [ ] Opening month derived from `today` via `currentBsYear`/`currentBsMonth` — every hardcoded year/month constant removed
+- [ ] Today ringed in AD and BS; Today control returns to the current month
+- [ ] Horizontal swipe between months, capped at current + 3 via `monthWindow`
+- [ ] Day sheet on tap: state line, logged summary, one-tap flow, edit full log; read-only for future dates
+- [ ] One title, one legend
+
+**Step 5 — Home quick-log**
+
+- [ ] Pure `core/quickLog.ts` with merge semantics, tested
+- [ ] Quick-log chip row on Home, gated by `quick_log_enabled`
+
+**Step 6 — log reframe**
+
+- [ ] Flow first as large labelled buttons; mood/symptoms/note behind "Add more"
+- [ ] One-time explainer gated by `log_explainer_seen`
+- [ ] Three-tap path re-verified: open → flow → save
+
+**Step 7 — journal**
+
+- [ ] Pure `core/journal.ts` grouping, tested
+- [ ] Journal section in Insights, paginated, tap-through to the day
+
+**Step 8 — visual polish**
+
+- [ ] Elevation tokens; palette unchanged (§11.2)
+- [ ] Status card hero with an SVG cycle-day ring
+- [ ] Transitions ≤ 200 ms, disabled under reduce-motion
+- [ ] Every new string in `src/i18n/en.ts`
+
+**Done when:** the new §15 acceptance boxes pass on a real gesture-navigation phone, `npm test` and `npm run typecheck` are green, and the sensitive copy in §5.6, §6.2, §7, and §8 is byte-identical to before the pass.
 
 ---
 

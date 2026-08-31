@@ -18,13 +18,15 @@ interface MonthGridProps {
   prediction: Prediction;
   monthLogs: Record<string, LogRow>;
   system: 'AD' | 'BS';
+  /** The day sheet's open date, if any — rendered with its own ring, distinct from today's. */
+  selected?: string | null;
   onPressDay: (dateIso: string) => void;
 }
 
 const WEEKHEAD = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 export function MonthGrid({
-  grid, today, periods, prediction, monthLogs, system, onPressDay,
+  grid, today, periods, prediction, monthLogs, system, selected = null, onPressDay,
 }: MonthGridProps) {
   return (
     <View>
@@ -39,7 +41,7 @@ export function MonthGrid({
       {/* Week-day letters (matches DayCell's hidden legend when hideWeekday=true) */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-around', paddingVertical: spacing.xs }}>
         {WEEKHEAD.map((l, idx) => (
-          <Text key={l + idx} style={{ ...typography.caption, color: colors.textMuted, width: 36, textAlign: 'center' }}>{l}</Text>
+          <Text key={l + idx} style={{ ...typography.caption, color: colors.textMuted, width: 44, textAlign: 'center' }}>{l}</Text>
         ))}
       </View>
 
@@ -63,19 +65,21 @@ export function MonthGrid({
             const bs = NepaliDate.fromAD(new Date(cell.iso + 'T12:00:00')).getBS();
             return bs.date; // the BS day-of-month for this AD date
           })();
+          // §6.3.1 — a future date is still tappable; the day sheet just renders it
+          // read-only. It is dimmed here for the same reason `faded` dims a fill cell: it
+          // reads as "not the current focus", not as disabled.
           return (
             <Pressable
               key={cell.iso}
-              onPress={isFuture ? undefined : () => onPressDay(cell.iso)}
-              disabled={isFuture}
-              style={{ width: 36, height: 56, alignItems: 'center', justifyContent: 'flex-start', opacity: isFuture ? 0.4 : 1 }}
+              onPress={() => onPressDay(cell.iso)}
+              style={{ width: 44, height: 60, alignItems: 'center', justifyContent: 'flex-start', opacity: isFuture ? 0.4 : 1 }}
             >
               <DayCell
                 dateIso={cell.iso}
                 state={state}
                 isToday={isToday}
-                disabled={isFuture}
-                onPress={isFuture ? undefined : () => onPressDay(cell.iso)}
+                isSelected={cell.iso === selected}
+                onPress={() => onPressDay(cell.iso)}
                 label={bsLabel}
                 faded={cell.fill}
                 hideWeekday

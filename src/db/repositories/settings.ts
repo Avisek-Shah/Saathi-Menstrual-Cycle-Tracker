@@ -2,6 +2,15 @@ import { openDB } from '../client';
 
 export type CalendarSystem = 'AD' | 'BS';
 
+/**
+ * §4.3 — the days onboarding seeded as flow, so a later change to the last-period date
+ * (§6.7 re-seed rule) can clear exactly those days and nothing the user logged herself.
+ */
+export interface SeedRange {
+  start: string;
+  end: string;
+}
+
 /** The settings key/value store, typed. Mirrors §4.3 exactly. */
 export interface Settings {
   onboarding_complete: boolean;
@@ -20,6 +29,12 @@ export interface Settings {
   // SPEC: 2026-08-31 — not in §4.3. Tracks the §5.6 irregular-cycles notice so it shows
   // once per detection; reset to false when cycles stop being irregular. See DECISIONS.md.
   irregular_notice_seen: boolean;
+  // §4.3 (M10). Which days onboarding seeded; null once the user has no seeded period left.
+  onboarding_seed_range: SeedRange | null;
+  // §6.4 (M10). The one-time "what logging is for" card.
+  log_explainer_seen: boolean;
+  // §6.2 (M10). Lets a user hide the Home quick-log row.
+  quick_log_enabled: boolean;
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
@@ -37,6 +52,9 @@ export const SETTINGS_DEFAULTS: Settings = {
   notif_daily_log_time: '20:00',
   schema_version: 1,
   irregular_notice_seen: false,
+  onboarding_seed_range: null,
+  log_explainer_seen: false,
+  quick_log_enabled: true,
 };
 
 type SettingKey = keyof Settings;
@@ -49,7 +67,12 @@ const BOOLEAN_KEYS = new Set<SettingKey>([
   'notif_fertile_start',
   'notif_daily_log',
   'irregular_notice_seen',
+  'log_explainer_seen',
+  'quick_log_enabled',
 ]);
+
+/** Keys stored as JSON. `''` means null — `serialize` already collapses null to empty. */
+const JSON_KEYS = new Set<SettingKey>(['onboarding_seed_range']);
 
 const NUMBER_KEYS = new Set<SettingKey>([
   'reported_cycle_length',
@@ -59,7 +82,9 @@ const NUMBER_KEYS = new Set<SettingKey>([
 ]);
 
 function serialize(value: Settings[SettingKey]): string {
-  return value === null ? '' : String(value);
+  if (value === null) return '';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
 }
 
 function deserialize<K extends SettingKey>(key: K, raw: string): Settings[K] {
@@ -68,6 +93,15 @@ function deserialize<K extends SettingKey>(key: K, raw: string): Settings[K] {
   }
   if (NUMBER_KEYS.has(key)) {
     return Number(raw) as Settings[K];
+  }
+  if (JSON_KEYS.has(key)) {
+    if (raw === '') return null as Settings[K];
+    try {
+      return JSON.parse(raw) as Settings[K];
+    } catch {
+      // A corrupt row must not take the app down on launch; treat it as unset.
+      return null as Settings[K];
+    }
   }
   if (key === 'birth_year') {
     return (raw === '' ? null : Number(raw)) as Settings[K];

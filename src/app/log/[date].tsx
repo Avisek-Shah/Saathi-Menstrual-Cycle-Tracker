@@ -1,7 +1,17 @@
 import { format, parseISO } from 'date-fns';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   FLOW_LEVELS,
@@ -13,10 +23,12 @@ import {
   type FlowLevel,
 } from '../../core/enums';
 import { getByDate } from '../../db/repositories/dailyLogs';
+import { Card } from '../../components/ui/Card';
 import { Chip } from '../../components/ui/Chip';
 import { en, fill } from '../../i18n/en';
 import { todayIso } from '../../services/clock';
 import { useCycleStore } from '../../stores/useCycleStore';
+import { useSettingsStore } from '../../stores/useSettingsStore';
 import { colors } from '../../theme/colors';
 import { MIN_TOUCH_TARGET, radius, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -77,13 +89,18 @@ function FlowOption({
 export default function LogModal() {
   const { date } = useLocalSearchParams<{ date: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const saveLog = useCycleStore((s) => s.saveLog);
+  const explainerSeen = useSettingsStore((s) => s.settings.log_explainer_seen);
+  const updateSettings = useSettingsStore((s) => s.update);
 
   const [flow, setFlow] = useState<FlowLevel>('none');
   const [moods, setMoods] = useState<string[]>([]);
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [note, setNote] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
+  // §6.4 — "Add more" starts open only when the day already has mood, symptoms, or a note.
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -94,11 +111,17 @@ export default function LogModal() {
       setSymptoms(row.symptoms);
       setNote(row.note ?? '');
       setNoteOpen(Boolean(row.note));
+      setMoreOpen(row.moods.length > 0 || row.symptoms.length > 0 || Boolean(row.note));
     });
     return () => {
       active = false;
     };
   }, [date]);
+
+  // §6.4 — the explainer is dismissed by any interaction with the screen, not just a button.
+  const dismissExplainer = () => {
+    if (!explainerSeen) void updateSettings({ log_explainer_seen: true });
+  };
 
   const isFuture = date > todayIso();
 
@@ -119,14 +142,18 @@ export default function LogModal() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.surface }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.surface }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
+          paddingTop: insets.top + spacing.md,
           paddingHorizontal: spacing.lg,
-          paddingVertical: spacing.md,
+          paddingBottom: spacing.md,
           borderBottomWidth: 1,
           borderBottomColor: colors.border,
         }}
@@ -154,10 +181,20 @@ export default function LogModal() {
           <Text style={{ ...typography.body, color: colors.textMuted }}>{en.logFutureBlocked}</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.xl }}>
+        <ScrollView
+          contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xl, gap: spacing.xl }}
+          keyboardShouldPersistTaps="handled"
+          onTouchStart={dismissExplainer}
+        >
+          {!explainerSeen ? (
+            <Card style={{ backgroundColor: colors.primaryMuted, borderColor: colors.primaryMuted }}>
+              <Text style={{ ...typography.body, color: colors.text }}>{en.logExplainerBody}</Text>
+            </Card>
+          ) : null}
+
           <View>
-            <Text style={{ ...typography.cardTitle, color: colors.text, marginBottom: spacing.md }}>
-              {en.logFlow}
+            <Text style={{ ...typography.title, color: colors.text, marginBottom: spacing.md }}>
+              {en.logHeaderQuestion}
             </Text>
             <View style={{ flexDirection: 'row', gap: spacing.xs }}>
               {FLOW_LEVELS.map((level, index) => (
@@ -166,91 +203,114 @@ export default function LogModal() {
                   level={level}
                   index={index}
                   selected={flow === level}
-                  onPress={() => setFlow(level)}
+                  onPress={() => {
+                    setFlow(level);
+                    dismissExplainer();
+                  }}
                 />
               ))}
             </View>
           </View>
 
-          <View>
-            <Text style={{ ...typography.cardTitle, color: colors.text, marginBottom: spacing.md }}>
-              {en.logMood}
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-              {MOODS.map((m) => (
-                <Chip
-                  key={m}
-                  label={moodLabel(m)}
-                  selected={moods.includes(m)}
-                  onPress={() => setMoods((prev) => toggle(prev, m))}
-                />
-              ))}
-            </View>
-          </View>
-
-          <View>
-            <Text style={{ ...typography.cardTitle, color: colors.text, marginBottom: spacing.md }}>
-              {en.logSymptoms}
-            </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
-              {SYMPTOMS_ORDERED.map((s) => (
-                <Chip
-                  key={s}
-                  label={symptomLabel(s)}
-                  selected={symptoms.includes(s)}
-                  onPress={() => setSymptoms((prev) => toggle(prev, s))}
-                />
-              ))}
-            </View>
-          </View>
-
-          <View>
-            {noteOpen ? (
-              <>
+          {!moreOpen ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setMoreOpen(true)}
+              style={{ minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' }}
+            >
+              <Text style={{ ...typography.body, color: colors.primary }}>{en.logAddMore}</Text>
+            </Pressable>
+          ) : (
+            <>
+              <View>
                 <Text style={{ ...typography.cardTitle, color: colors.text, marginBottom: spacing.md }}>
-                  {en.logNote}
+                  {en.logMood}
                 </Text>
-                <TextInput
-                  value={note}
-                  onChangeText={setNote}
-                  maxLength={NOTE_MAX}
-                  multiline
-                  placeholder={en.logNotePlaceholder}
-                  placeholderTextColor={colors.textMuted}
-                  style={{
-                    ...typography.body,
-                    color: colors.text,
-                    minHeight: 96,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    borderRadius: radius.control,
-                    padding: spacing.md,
-                    textAlignVertical: 'top',
-                  }}
-                />
-                <Text
-                  style={{
-                    ...typography.caption,
-                    color: colors.textMuted,
-                    alignSelf: 'flex-end',
-                    marginTop: spacing.xs,
-                  }}
-                >
-                  {fill(en.logNoteCount, { n: note.length })}
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                  {MOODS.map((m) => (
+                    <Chip
+                      key={m}
+                      label={moodLabel(m)}
+                      selected={moods.includes(m)}
+                      onPress={() => setMoods((prev) => toggle(prev, m))}
+                    />
+                  ))}
+                </View>
+              </View>
+
+              <View>
+                <Text style={{ ...typography.cardTitle, color: colors.text, marginBottom: spacing.md }}>
+                  {en.logSymptoms}
                 </Text>
-              </>
-            ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+                  {SYMPTOMS_ORDERED.map((s) => (
+                    <Chip
+                      key={s}
+                      label={symptomLabel(s)}
+                      selected={symptoms.includes(s)}
+                      onPress={() => setSymptoms((prev) => toggle(prev, s))}
+                    />
+                  ))}
+                </View>
+              </View>
+
+              <View>
+                {noteOpen ? (
+                  <>
+                    <Text style={{ ...typography.cardTitle, color: colors.text, marginBottom: spacing.md }}>
+                      {en.logNote}
+                    </Text>
+                    <TextInput
+                      value={note}
+                      onChangeText={setNote}
+                      maxLength={NOTE_MAX}
+                      multiline
+                      placeholder={en.logNotePlaceholder}
+                      placeholderTextColor={colors.textMuted}
+                      style={{
+                        ...typography.body,
+                        color: colors.text,
+                        minHeight: 96,
+                        borderWidth: 1,
+                        borderColor: colors.border,
+                        borderRadius: radius.control,
+                        padding: spacing.md,
+                        textAlignVertical: 'top',
+                      }}
+                    />
+                    <Text
+                      style={{
+                        ...typography.caption,
+                        color: colors.textMuted,
+                        alignSelf: 'flex-end',
+                        marginTop: spacing.xs,
+                      }}
+                    >
+                      {fill(en.logNoteCount, { n: note.length })}
+                    </Text>
+                  </>
+                ) : (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setNoteOpen(true)}
+                    style={{ minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' }}
+                  >
+                    <Text style={{ ...typography.body, color: colors.primary }}>{en.logAddNote}</Text>
+                  </Pressable>
+                )}
+              </View>
+
               <Pressable
                 accessibilityRole="button"
-                onPress={() => setNoteOpen(true)}
+                onPress={() => setMoreOpen(false)}
                 style={{ minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' }}
               >
-                <Text style={{ ...typography.body, color: colors.primary }}>{en.logAddNote}</Text>
+                <Text style={{ ...typography.caption, color: colors.textMuted }}>{en.logHideMore}</Text>
               </Pressable>
-            )}
-          </View>
+            </>
+          )}
         </ScrollView>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }

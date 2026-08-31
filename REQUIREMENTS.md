@@ -47,8 +47,13 @@ A privacy-first Android app (React Native + Expo) for tracking menstrual cycles,
 | Charts | `react-native-gifted-charts` (+ `react-native-svg`) | |
 | Notifications | `expo-notifications` | Local scheduled only, never remote |
 | Secure storage | `expo-secure-store` | PIN hash only |
+| Safe areas | `react-native-safe-area-context` | Insets for status bar, notch, and gesture nav (§11.6) |
+| Gestures | `react-native-gesture-handler` | Calendar month swipe, day sheet drag |
+| Motion | `react-native-reanimated` | Short transitions only (§11.7) |
 | Build | EAS Build, `preview` profile producing an APK | |
 | Updates | `expo-updates` via EAS Update | JS changes ship OTA; native changes need a new APK |
+
+Every library in this table is already installed. The M10 UX pass (§16) adds **no new dependency** — safe areas, gestures, motion, and the cycle ring all use packages Expo already pulls in.
 
 ### Hard constraints
 
@@ -141,6 +146,12 @@ Enum values are stable identifiers. Display labels come from the string table (�
 | `notif_daily_log` | boolean | `false` |
 | `notif_daily_log_time` | `'HH:mm'` | `'20:00'` |
 | `schema_version` | number | `1` |
+| `irregular_notice_seen` | boolean | `false` |
+| `onboarding_seed_range` | JSON `{start,end}` or null | `null` |
+| `log_explainer_seen` | boolean | `false` |
+| `quick_log_enabled` | boolean | `true` |
+
+`onboarding_seed_range` records exactly which days onboarding seeded as flow. It exists so a later change to the last-period date (§6.7) can remove precisely those days instead of guessing which flow the user entered herself. `log_explainer_seen` gates the one-time explainer on the log screen (§6.4). `quick_log_enabled` hides the Home quick-log row (§6.2) for a user who does not want it.
 
 ### 4.4 Access rules
 
@@ -255,15 +266,23 @@ Bottom tabs: **Home · Calendar · Insights · Settings**. Logging is a modal re
 
 ### 6.1 Onboarding (first launch only)
 
-Five steps, swipeable, with a skip on the last. Progress dots at top.
+Five steps, swipeable, with a skip on the last. Progress dots in the footer, beside the navigation buttons.
+
+**Every answer step accepts two input methods for the same value: quick-choice chips and a typed field.** A chip fills the field; typing clears the chip selection. Neither is required — a step is satisfied by whichever the user touches. Validation is inline, beneath the field, and never blocks with a dialog.
 
 1. **Welcome** — one screen, name of app, one sentence on what it does, one sentence stating that data stays on the phone.
-2. **Last period start date** — date picker, cannot be in the future, cannot be more than 90 days ago. If she doesn't remember, offer "I'm not sure" which sets the anchor to `today − reported_cycle_length`.
-3. **Typical cycle length** — horizontal number picker, 21–45, default 28, with an "I don't know" option that keeps 28.
-4. **Typical period length** — picker 1–10, default 5.
-5. **Birth year** — picker, range `currentYear − 60` to `currentYear − 9`. Used only for age-appropriate copy in Insights; never displayed back as an age.
+2. **Last period start date** — chips for Today, Yesterday, 3 days ago, 1 week ago, 2 weeks ago; a **Pick a date** control opening an in-app month grid (the same grid component as §6.3, honouring `calendar_system`); and "I'm not sure", which sets the anchor to `today − reported_cycle_length`. Dates in the future or more than 90 days ago are not selectable.
+3. **Typical cycle length** — chips 26 / 28 / 30 / 32, a numeric field accepting 21–45, and the horizontal number picker. An "I don't know" option keeps 28.
+4. **Typical period length** — chips 3 / 4 / 5 / 6 / 7, a numeric field accepting 1–10, and the picker. Default 5.
+5. **Birth year** — a 4-digit numeric field plus decade chips, range `currentYear − 60` to `currentYear − 9`. Used only for age-appropriate copy in Insights; never displayed back as an age. Skippable.
 
-On finish: write settings, seed `daily_logs` with flow for the reported last period (start date through `start + reported_period_length − 1`, flow `medium`), run `recomputePeriods()`, set `onboarding_complete = true`, schedule notifications.
+**Out-of-range or non-numeric input** shows the valid range beneath the field and leaves the last valid value in place. It never silently clamps behind the user's back.
+
+**Footer.** Back, progress dots, and Next sit in a footer that clears the system navigation bar per §11.6. On the last step Next becomes Finish. The footer must never be overlapped by the gesture bar, and its controls are at least 48px tall — an unreachable Next button is the single most damaging failure in the app, because it blocks first launch entirely.
+
+On finish: write settings, seed `daily_logs` with flow for the reported last period (start date through `start + reported_period_length − 1`, flow `medium`), record that seeded range in `onboarding_seed_range`, run `recomputePeriods()`, set `onboarding_complete = true`, schedule notifications.
+
+**Every answer collected here is stored and editable afterwards from Settings → My cycle (§6.7).** Onboarding is not a one-time irreversible interview.
 
 ### 6.2 Home
 
@@ -278,34 +297,54 @@ Vertical scroll. In order:
    - Not on a period → "Log today"
    - No log for today and a period is expected → "My period started"
    - On a period → "Log today"
-3. **This week strip** — 7 day-circles (3 before today, today, 3 after) each colour-coded by state (§11.2), tappable to open the log modal for that date.
-4. **Fertile window card** — dates, days-until, and the line: *"An estimate. Not reliable as birth control."* This line is not dismissible and is always present on this card.
-5. **Today's log summary** — if logged, a compact chip row of flow/mood/symptoms with an edit affordance; if not, an empty prompt.
+3. **Quick-log row** — at most five one-tap chips that write immediately without opening a modal: the flow level (when on a period) and the user's most-used recent symptoms. A tap **merges** into today's existing log — it never replaces mood, symptoms, or a note already saved for that day. Tapping a selected chip removes that value again. Hidden when `quick_log_enabled` is false.
+4. **This week strip** — 7 day-circles (3 before today, today, 3 after) each colour-coded by state (§11.2), tappable to open the log modal for that date.
+5. **Fertile window card** — dates, days-until, and the line: *"An estimate. Not reliable as birth control."* This line is not dismissible and is always present on this card.
+6. **Today's log summary** — if logged, a compact chip row of flow/mood/symptoms with an edit affordance; if not, an empty prompt.
 
 ### 6.3 Calendar
 
-- Month grid, swipe horizontally between months, cannot scroll past current month + 3 (predictions beyond that are meaningless).
-- Each day cell shows its state colour and a small dot if anything was logged.
-- Header switches between AD and BS labels per setting; in BS mode, show the BS month name as the title and the AD range as a subtitle.
-- Tapping a day opens the log modal for that date. Future dates beyond today are not loggable — tapping shows the prediction detail instead.
+- Month grid, **swipe horizontally between months**, cannot scroll past current month + 3 (predictions beyond that are meaningless). Arrow controls do the same thing for a user who does not swipe; both respect the cap.
+- **The month shown when the tab opens is the current month in the active calendar system, derived from today's date.** Never a hardcoded year/month constant. Switching AD ↔ BS re-derives it.
+- **Today is always ringed** (§11.2), in both AD and BS mode. A **Today** control returns to the current month whenever the view has moved away from it.
+- Each day cell shows its state colour and a small dot if anything was logged. The selected day carries a ring distinct from today's.
+- Header switches between AD and BS labels per setting; in BS mode, show the BS month name as the title and the AD range as a subtitle. The title and the legend each appear exactly once.
+- **Tapping any day opens the day sheet** (§6.3.1) — this is the primary way to log from the calendar.
 - Legend row beneath the grid.
+
+#### 6.3.1 Day sheet
+
+A bottom sheet for one tapped day, showing in order:
+
+1. The date in the active calendar system.
+2. One state line: period day *N*, predicted period, fertile window, ovulation estimate, or nothing predicted.
+3. What is already logged that day — flow, mood and symptom chips, note excerpt — or an empty prompt.
+4. **One-tap flow buttons**, writing immediately and merging like the quick-log row (§6.2).
+5. **Edit full log**, opening the log modal (§6.4) for that date.
+
+For a **future** date the sheet is read-only: prediction detail, nothing loggable (§10.1).
 
 ### 6.4 Log modal (bottom sheet, full height)
 
-Header shows the date being logged. Sections, in order:
+Header shows the date being logged, and the screen asks the day's question rather than naming a feature. Sections, in order:
 
-1. **Flow** — five options, single select, horizontally laid out with icons of increasing weight. Selecting `none` clears the day's flow.
-2. **Mood** — chips, multi-select, no limit.
-3. **Symptoms** — chips, multi-select, grouped loosely (pain / body / digestion) but without visible group headers.
-4. **Note** — collapsed by default; expands to a 500-char text area.
+1. **Flow** — five options, single select, laid out as large labelled buttons with icons of increasing weight. This is the first and most prominent thing on the screen, because it is the only input that changes a prediction. Selecting `none` clears the day's flow.
+2. **Add more** — a disclosure revealing mood, symptoms, and note. Collapsed by default; expanded automatically when the day already has any of them saved.
+   - **Mood** — chips, multi-select, no limit.
+   - **Symptoms** — chips, multi-select, grouped loosely (pain / body / digestion) but without visible group headers.
+   - **Note** — collapsed by default; expands to a 500-char text area, kept clear of the keyboard.
+
+The **enums in §4.2 do not change.** This section governs presentation only; every mood and symptom stays available.
+
+**One-time explainer.** The first time this screen opens, a small card above the flow section explains in two sentences what logging is for: flow days become periods, periods become the prediction, and mood and symptoms are kept for the user's own reference. It says plainly that nothing here is required. Gated by `log_explainer_seen`; once dismissed it never returns.
 
 Save and cancel in the header. Save writes `daily_logs`, triggers `recomputePeriods()`, recomputes predictions, and reschedules notifications. Optimistic UI: close immediately, write in the background, and if the write fails show a toast and reopen with the values preserved.
 
-**Three-tap requirement:** open modal → tap flow → tap save.
+**Three-tap requirement:** open modal → tap flow → tap save. The disclosure must not add a tap to this path.
 
 ### 6.5 Insights
 
-Three sections, each in a card:
+Four sections, each in a card:
 
 1. **Stats** — average cycle length, average period length, shortest and longest cycle, number of cycles tracked. When fewer than 2 cycles exist, show a "keep logging to see your patterns" state instead of zeros.
 2. **Charts**
@@ -314,6 +353,7 @@ Three sections, each in a card:
    - *Symptom frequency*: horizontal bars, top 6 symptoms by count over the last 90 days.
    - Every chart needs an explicit empty state with the minimum data required stated ("needs at least 2 completed cycles").
 3. **Cycle history** — list, newest first: start date, end date, period length, cycle length, outlier badge. Tapping a row jumps the Calendar tab to that month.
+4. **Journal** — the readable record of what was logged, newest first, grouped by month. Each row: the date per `calendar_system`, a flow marker, mood and symptom chips, and the first line of any note. Tapping a row opens that day's log modal. Loads a page at a time rather than the whole history. Its empty state names what would appear here, so the section explains itself before there is any data in it.
 
 ### 6.6 Learn (accessible from Insights, not a tab)
 
@@ -332,15 +372,31 @@ Tone: calm, factual, non-clinical, no euphemisms. Written for an adult reader wh
 
 ### 6.7 Settings
 
-- Calendar system (AD / BS toggle)
+- **My cycle** — every answer given during onboarding (§6.1), editable at any time, using the same chips-plus-typed-field controls:
+  - typical cycle length (21–45)
+  - typical period length (1–10)
+  - birth year, or cleared
+  - **last period start date** — see the re-seed rule below
+  - calendar system (AD / BS toggle)
 - Notifications (each toggle from §4.3, plus a time picker for the daily reminder)
 - App lock (PIN — see §8)
-- Cycle defaults (edit reported cycle/period length)
+- Quick-log row on Home (`quick_log_enabled`)
 - Export data (writes a JSON file via the share sheet — a manual user action, not backup, and explicitly not restored by the app in v1)
 - Delete all data (double confirmation; the second dialog is a hold-to-confirm button)
 - About — version, and the full disclaimer text:
 
 > *"Saathi is a tracking tool, not a medical device. Predictions are estimates based on the dates you log. They are not reliable as contraception and are not medical advice."*
+
+**Changing the last period start date (the re-seed rule).** Editing this value is not a silent rewrite of history:
+
+1. Show a confirmation naming what will change. Nothing is written until it is accepted.
+2. Clear flow **only** on days that are inside `onboarding_seed_range` **and** carry no mood, symptom, or note. A day the user has touched herself is never cleared; her flow entries outside the seeded range are never touched.
+3. Seed flow `medium` for `newStart … newStart + reported_period_length − 1`.
+4. Run `recomputePeriods()` and overwrite `onboarding_seed_range` with the new range.
+
+This stays inside the rule that the app never auto-logs a period the user did not enter: the seed is her own onboarding answer, and this is her correcting it.
+
+Editing typical cycle or period length writes settings only. It changes predictions on the next recompute (§5.8) and never writes to `daily_logs`.
 
 ---
 
@@ -398,6 +454,10 @@ The words "period", "cycle", "fertile", and the app name must not appear in any 
 7. Device timezone or clock changes — recompute on foreground; never store timestamps for date logic, only date strings.
 8. Very long note text and long symptom lists — nothing overflows or truncates the save button.
 9. DB migration path — `schema_version` in settings, with a migration runner in `src/db/migrate.ts` even though v1 has only one version. **Do not skip this.**
+10. Changing the last period start date after onboarding — follow the re-seed rule in §6.7. Days the user logged herself survive it.
+11. Gesture-navigation and cutout devices — no interactive control may sit inside a system inset (§11.6). Verify on a phone with gesture navigation, not only on an emulator with three-button navigation.
+12. Today falling outside the displayed month — the calendar always offers a one-tap return to the current month (§6.3).
+13. A day with mood or symptoms but no flow, opened from the journal — it renders as a normal entry; the journal is not a period list.
 
 ---
 
@@ -441,6 +501,21 @@ System font. Scale: 34 (hero number), 24 (screen title), 18 (card title), 15 (bo
 ### 11.5 Dark mode
 
 Not in v1. But define all colours as tokens in `src/theme/colors.ts` so a dark palette is a single-file addition later.
+
+### 11.6 Layout and safe areas
+
+- Every screen renders through **one shared wrapper** that applies `useSafeAreaInsets()`. No screen positions its own content against the raw window.
+- The status bar, notch, and gesture bar are treated as occupied space: a title never starts at `y = 0`, and a button never ends at the bottom edge.
+- The bottom tab bar adds `insets.bottom` to its height; modals add `insets.top` to their header.
+- Any fixed footer adds `insets.bottom` plus normal spacing, and its controls are at least 48px tall.
+- Touch targets stay at 44×44 minimum (§11.4). A control that looks reachable but is not is a functional bug, not a polish item.
+
+### 11.7 Motion
+
+- Transitions are 200 ms or shorter, and animate opacity and translation only — never layout, colour, or size in a way that shifts text.
+- Motion is never the only signal for a state change; the state is legible with animation disabled.
+- Honour the OS reduce-motion setting: when it is on, transitions resolve immediately.
+- No looping, decorative, or attention-seeking animation anywhere in the app.
 
 ---
 
@@ -529,6 +604,19 @@ Jest with `@testing-library/react-native`. The following must have unit tests be
 
 **`calendar.ts`**
 - Known AD↔BS date pairs, including a BS month with 32 days
+- `currentBsYear` / `currentBsMonth` against known dates — the calendar's opening month depends on them (§6.3)
+
+**`onboarding.ts`** (M10)
+- Numeric input parsing: empty, non-numeric, below range, above range, valid
+- Quick date choices resolve to the right ISO dates for a given `today`
+- Re-seed planning: days carrying mood/symptom/note are excluded from the clear list; the new seed range is correct at period lengths 1 and 10
+
+**`quickLog.ts`** (M10)
+- A quick toggle merges into an existing log and never drops moods, symptoms, or a note
+- Tapping a selected chip removes only that value
+
+**`journal.ts`** (M10)
+- Month grouping is newest-first in both AD and BS, and a month boundary falls where the active system says it does
 
 **Fixtures.** Provide `scripts/seed.ts` generating three datasets:
 
@@ -557,6 +645,13 @@ v1 is done when all of these are true:
 - [ ] The app builds an installable APK via EAS `preview` profile
 - [ ] No network request originates from the app other than the Expo update check
 - [ ] 200% OS font scale does not clip the Home status card
+- [ ] On a phone with gesture navigation, every onboarding step's Next button is fully visible and responds to the first tap
+- [ ] No screen title is obscured by the status bar on a device with a notch or punch-hole camera
+- [ ] Every onboarding answer can be typed as well as chosen, and every one of them can be changed later from Settings → My cycle
+- [ ] Changing the last period start date re-seeds correctly and destroys no day the user logged herself
+- [ ] In BS mode the calendar opens on the current Nepali month with today ringed, and the Today control returns to it from any month
+- [ ] Tapping any day in the calendar opens the day sheet; a one-tap flow from that sheet updates the grid immediately
+- [ ] The journal in Insights lists a day logged moments earlier, newest first
 
 ---
 
@@ -576,6 +671,7 @@ Full detail in `BUILD_PLAN.md`. Summary:
 | **M7** | Settings, notifications, PIN lock, export, delete-all |
 | **M8** | Learn articles |
 | **M9** | Edge cases (§10), accessibility pass, EAS APK build, expo-updates wiring |
+| **M10** | UX pass: safe areas (§11.6), onboarding input + editable profile (§6.1, §6.7), calendar day sheet and swipe (§6.3), Home quick-log (§6.2), log reframe (§6.4), journal (§6.5), motion (§11.7) |
 
 M2 before M4 is deliberate — the prediction logic is the product, and it should be correct in isolation before any screen depends on it.
 

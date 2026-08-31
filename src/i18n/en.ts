@@ -39,25 +39,81 @@ export const en = {
   settingsCalendarSystem: 'Calendar system',
   settingsNotifications: 'Notifications',
 
+  // Insights → Journal (§6.5, M10).
+  insightsJournalTitle: 'Journal',
+  journalEmpty: 'Days you log will show up here, newest first.',
+  journalLoadMore: 'Load more',
+  journalNothingLogged: 'Nothing logged',
+
+  // Settings (§6.7, M10 rebuild).
+  settingsMyCycleSection: 'My cycle',
+  settingsMyCycleRow: 'Cycle length, period length, birth year, last period',
+  settingsAppSection: 'App',
+  settingsAppLock: 'App lock',
+  settingsQuickLog: 'Quick-log on Home',
+  settingsDataSection: 'Data',
+  settingsExportData: 'Export data',
+  settingsDeleteAllData: 'Delete all data',
+  settingsAboutSection: 'About',
+  settingsNotBuiltYet: 'Not available yet',
+  settingsVersion: 'Version {version}',
+  settingsOn: 'On',
+  settingsOff: 'Off',
+  settingsNotifPeriodSoon: 'Period reminder',
+  settingsNotifPeriodToday: 'Day-of reminder',
+  settingsNotifFertileStart: 'Fertile window reminder',
+  settingsNotifDailyLog: 'Daily check-in reminder',
+  settingsNotifCaption: 'Saved now; scheduled reminders arrive with a later update.',
+
+  // Settings → My cycle (§6.7).
+  profileTitle: 'My cycle',
+  profileCycleLength: 'Typical cycle length',
+  profilePeriodLength: 'Typical period length',
+  profileBirthYear: 'Birth year',
+  profileBirthYearCleared: 'Not set',
+  profileClear: 'Clear',
+  profileLastPeriodStart: 'Last period start',
+  profileLastPeriodStartUnset: 'Not recorded',
+  profileChangeDate: 'Change date',
+  profileSave: 'Save',
+  profileSaved: 'Saved',
+  // The re-seed confirmation (§6.7, §10.10) — states plainly what will and won't change.
+  profileAnchorConfirmTitle: 'Change last period start?',
+  profileAnchorConfirmBody:
+    'This updates the days used to predict your next period. Any day you logged yourself is kept exactly as you entered it.',
+  profileAnchorConfirmAction: 'Change it',
+
   // Onboarding (§6.1). {n} filled via `fill`.
   onboardingWelcomeTitle: 'Saathi',
   onboardingWelcomeWhat: 'Track your cycle, and see when your next period and fertile window are likely.',
   onboardingWelcomePrivacy: 'Everything you enter stays on this phone. There is no account and nothing is sent anywhere.',
   onboardingStartTitle: 'When did your last period start?',
-  onboardingStartHelp: 'Pick the day the bleeding began.',
+  onboardingStartHelp: 'Pick the day the bleeding began, or type it in.',
   onboardingStartNotSure: "I'm not sure",
+  onboardingStartToday: 'Today',
+  onboardingStartYesterday: 'Yesterday',
+  onboardingStart3DaysAgo: '3 days ago',
+  onboardingStart1WeekAgo: '1 week ago',
+  onboardingStart2WeeksAgo: '2 weeks ago',
+  onboardingPickDate: 'Pick a date',
+  onboardingHideDate: 'Hide date picker',
   onboardingCycleTitle: 'How long is your typical cycle?',
-  onboardingCycleHelp: 'Count from the first day of one period to the first day of the next. Most are 24 to 35 days.',
+  onboardingCycleHelp: 'Count from the first day of one period to the first day of the next. Most are 24 to 35 days. Type it in, or choose a number below.',
   onboardingCycleUnit: '{n} days',
   onboardingDontKnow: "I don't know",
   onboardingPeriodTitle: 'How many days does your period usually last?',
-  onboardingPeriodHelp: 'Count the days you have any bleeding.',
+  onboardingPeriodHelp: 'Count the days you have any bleeding. Type it in, or choose a number below.',
   onboardingBirthYearTitle: 'Which year were you born?',
-  onboardingBirthYearHelp: 'Used only to tailor a few tips. It is never shown back as your age.',
+  onboardingBirthYearHelp: 'Used only to tailor a few tips. It is never shown back as your age. Type it in, or choose a year below.',
   onboardingBack: 'Back',
   onboardingNext: 'Next',
   onboardingSkip: 'Skip',
   onboardingFinish: 'Finish',
+  onboardingEditableLater: 'You can change any of this later from Settings → My cycle.',
+  numberFieldEmpty: 'Enter a number to continue',
+  numberFieldNotANumber: 'Enter a whole number',
+  numberFieldOutOfRangeCycle: 'Enter a number between {min} and {max} days',
+  numberFieldOutOfRangeYear: 'Enter a year between {min} and {max}',
 
   // Home (§6.2). {a}/{b}/{days} filled via `fill`.
   predictedOn: 'around {date}',
@@ -66,6 +122,7 @@ export const en = {
   fertileToday: 'today',
   fertileStartedDaysAgo: 'started {days} days ago',
   fertileIrregularNote: 'less reliable when cycles vary',
+  homeQuickLogLabel: 'Quick log',
   todaysLog: "Today's log",
   logSummaryEmpty: 'Nothing logged today',
   edit: 'Edit',
@@ -79,7 +136,12 @@ export const en = {
   recalcAction: 'Recalculate',
 
   // Log modal (§6.4).
+  logHeaderQuestion: 'How was today?',
+  logExplainerBody:
+    'Flow days become periods, and periods become the prediction. Mood and symptoms are just for your own reference. None of this is required.',
   logFlow: 'Flow',
+  logAddMore: 'Add more',
+  logHideMore: 'Hide',
   logMood: 'Mood',
   logSymptoms: 'Symptoms',
   logNote: 'Note',
@@ -135,6 +197,11 @@ export const en = {
   legendToday: 'Today',
   calendarPrevMonth: 'Previous month',
   calendarNextMonth: 'Next month',
+  // Visible glyphs for the prev/next month controls — accessibilityLabel carries the real
+  // name (§11.4); these are decoration, but rule 6 keeps every rendered character here too.
+  calendarPrevGlyph: '‹',
+  calendarNextGlyph: '›',
+  numberFieldPlaceholder: '—',
   // Future-date detail (§6.3) — shown instead of the log modal.
   futureNotLoggable: "This day hasn't happened yet.",
   futurePredictedPeriod: 'Your period is predicted around this day.',
@@ -142,6 +209,12 @@ export const en = {
   futureOvulation: 'Ovulation is estimated on this day.',
   futureNothing: 'Nothing is predicted for this day.',
   close: 'Close',
+  calendarToday: 'Today',
+
+  // Day sheet (§6.3.1).
+  dayStatePeriodDay: 'Day {n} of this period',
+  daySheetNothingLogged: 'Nothing logged this day',
+  daySheetEditFull: 'Edit full log',
 
   // Notifications — must never name the app or cycle terms (§7). Do not edit without §7 review.
   notifReminder: 'Reminder',

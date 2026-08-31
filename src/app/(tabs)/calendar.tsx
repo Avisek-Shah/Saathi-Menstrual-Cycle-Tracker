@@ -1,34 +1,51 @@
+import { AppState } from 'react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, View, Text, Pressable } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { Pressable, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { formatDate, getMonthGrid, addMonth } from '../../core/calendar';
-import { dayCellState } from '../../core/home';
+import { addMonth, currentBsMonth, currentBsYear, getMonthGrid, type CalendarSystem } from '../../core/calendar';
+import { DaySheet } from '../../components/cycle/DaySheet';
+import { MonthGrid } from '../../components/cycle/MonthGrid';
+import { Screen } from '../../components/ui/Screen';
 import { en } from '../../i18n/en';
 import { todayIso } from '../../services/clock';
 import { colors } from '../../theme/colors';
-import { spacing, radius } from '../../theme/spacing';
+import { MIN_TOUCH_TARGET, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 import { useCycleStore } from '../../stores/useCycleStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
-import { MonthGrid } from '../../components/cycle/MonthGrid';
 import * as dailyLogs from '../../db/repositories/dailyLogs';
+import type { FlowLevel } from '../../core/enums';
 import type { Prediction } from '../../core/prediction';
-import { AppState } from 'react-native';
+
+const SWIPE_THRESHOLD = 50;
+
+/** The (year, month) containing `iso`, in the given calendar system (§6.3). */
+function currentMonthFor(system: CalendarSystem, today: string): { year: number; month: number } {
+  if (system === 'BS') return { year: currentBsYear(today), month: currentBsMonth(today) };
+  const d = new Date(today + 'T12:00:00');
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
 
 export default function CalendarScreen() {
+  const router = useRouter();
   const settings = useSettingsStore((s) => s.settings);
   const system = settings.calendar_system ?? 'AD';
-  const { periods, prediction, ready, refresh } = useCycleStore();
+  const { periods, prediction, ready, refresh, saveLog } = useCycleStore();
 
   const [today, setToday] = useState(todayIso());
-  // Active month (system-native). Swiping updates these directly.
-  const [year, setYear] = useState(() => system === 'BS' ? 2083 : 2026); // SPEC: initial shown month; not critical
-  const [month, setMonth] = useState(() => system === 'BS' ? 5 : 8); // Bhadra 2083 / Aug 2026
-  const [logs, setLogs] = useState<Record<string, import('../../db/repositories/dailyLogs').LogRow>>({});
+  const [cursor, setCursor] = useState(() => currentMonthFor(system, today));
+  const [logs, setLogs] = useState<Record<string, dailyLogs.LogRow>>({});
   const [selected, setSelected] = useState<string | null>(null);
 
-  // Refresh on focus / foreground / midnight rollover (same pattern as Home).
+  // §6.3 — switching AD ↔ BS re-derives the opening month; it never tries to translate the
+  // current cursor between systems.
+  useEffect(() => {
+    setCursor(currentMonthFor(system, today));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [system]);
+
   const refreshToday = useCallback(() => {
     const fresh = todayIso();
     setToday(fresh);
@@ -44,31 +61,30 @@ export default function CalendarScreen() {
     return () => sub.remove();
   }, [refreshToday]);
 
-  // Cap navigation at current + 3 (§6.3).
-  const current = system === 'BS'
-    ? (() => {
-        const { parseISO } = require('date-fns');
-        const d = parseISO(today);
-        // BS current from today — simplified; real conversion via calendar core would happen here.
-        // For M5 we rely on store + core; this is a display placeholder.
-        return { year: 2083, month: 5 };
-      })()
-    : (() => {
-        const d = new Date(today + 'T12:00:00');
-        return { year: d.getFullYear(), month: d.getMonth() + 1 };
-      })();
+  const current = currentMonthFor(system, today);
+  const end = addMonth(current.year, current.month, 3); // §6.3 — cannot view past current + 3.
+  const canNext = cursor.year < end.year || (cursor.year === end.year && cursor.month < end.month);
+  const canPrev = true;
 
-  const canNext = (() => {
-    const end = addMonth(current.year, current.month, 3);
-    return year < end.year || (year === end.year && month < end.month);
-  })();
+  const goMonth = useCallback(
+    (delta: number) => {
+      setCursor((c) => {
+        const next = addMonth(c.year, c.month, delta);
+        if (delta > 0 && !canNext) return c;
+        return next;
+      });
+    },
+    [canNext],
+  );
 
-  const canPrev = true; // always can go back
-
-  // Load logs for visible month (system ranges differ; approximate for M5 — full getRange to start/end).
-  const grid = useMemo(() => getMonthGrid(year, month, system, today), [year, month, system, today]);
+  const grid = useMemo(() => getMonthGrid(cursor.year, cursor.month, system, today), [cursor, system, today]);
   const rangeStart = grid.cells[0].iso;
   const rangeEnd = grid.cells[grid.cells.length - 1].iso;
+
+  const reloadMonthLogs = useCallback(async () => {
+    const rows = await dailyLogs.getRange(rangeStart, rangeEnd);
+    setLogs(Object.fromEntries(rows.map((r) => [r.date, r])));
+  }, [rangeStart, rangeEnd]);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,66 +95,115 @@ export default function CalendarScreen() {
     return () => { cancelled = true; };
   }, [rangeStart, rangeEnd]);
 
-  // Selected-day display (future = prediction detail; past/present = open log).
-  const handlePress = (dateIso: string) => {
-    if (dateIso > today) {
-      setSelected(dateIso); // show prediction detail instead of log modal
-    } else {
-      // Log modal route — deferred to /log/[date] (existing). For M5, just highlight.
-      setSelected(dateIso);
-    }
+  // §6.3 — swipe horizontally between months, in addition to the arrow controls.
+  const swipe = Gesture.Pan()
+    .activeOffsetX([-20, 20])
+    .onEnd((e) => {
+      if (e.translationX <= -SWIPE_THRESHOLD) goMonth(1);
+      else if (e.translationX >= SWIPE_THRESHOLD) goMonth(-1);
+    });
+
+  const handlePress = (dateIso: string) => setSelected(dateIso);
+
+  const handleSelectFlow = async (flow: FlowLevel) => {
+    if (!selected) return;
+    const existing = logs[selected] ?? null;
+    await saveLog(
+      selected,
+      flow,
+      existing?.moods ?? [],
+      existing?.symptoms ?? [],
+      existing?.note ?? null,
+      today,
+    );
+    await reloadMonthLogs();
   };
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
-  // Prediction for detail line.
-  const p = prediction || { ovulationDate: '', fertileStart: '', fertileEnd: '', nextPeriodStart: '', nextPeriodEnd: '' } as Prediction;
+  const p = prediction ?? ({
+    ovulationDate: '',
+    fertileStart: '',
+    fertileEnd: '',
+    nextPeriodStart: '',
+    nextPeriodEnd: '',
+  } as Prediction);
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ padding: spacing.md, gap: spacing.md }}>
-      {/* Month header + swipe controls */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md }}>
-        <Pressable onPress={() => { if (canPrev) { const n = addMonth(year, month, -1); setYear(n.year); setMonth(n.month); } }} disabled={!canPrev}>
-          <Text style={{ ...typography.body, color: canPrev ? colors.text : colors.textMuted }}>{en.calendarPrevMonth}</Text>
-        </Pressable>
-        <Text style={{ ...typography.title, color: colors.text }}>{grid.title}</Text>
-        <Pressable onPress={() => { if (canNext) { const n = addMonth(year, month, 1); setYear(n.year); setMonth(n.month); } }} disabled={!canNext}>
-          <Text style={{ ...typography.body, color: canNext ? colors.text : colors.textMuted }}>{en.calendarNextMonth}</Text>
-        </Pressable>
-      </View>
+    <Screen
+      title={en.calendar}
+      bottomInset
+      titleAction={
+        !grid.isCurrentMonth ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setCursor(current)}
+            style={{ minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' }}
+          >
+            <Text style={{ ...typography.body, color: colors.primary }}>{en.calendarToday}</Text>
+          </Pressable>
+        ) : null
+      }
+    >
+      <GestureDetector gesture={swipe}>
+        <View style={{ gap: spacing.md }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: spacing.md,
+            }}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={en.calendarPrevMonth}
+              disabled={!canPrev}
+              onPress={() => goMonth(-1)}
+              hitSlop={8}
+              style={{ minWidth: MIN_TOUCH_TARGET, minHeight: MIN_TOUCH_TARGET, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ ...typography.body, color: colors.text }}>{en.calendarPrevGlyph}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={en.calendarNextMonth}
+              disabled={!canNext}
+              onPress={() => goMonth(1)}
+              hitSlop={8}
+              style={{ minWidth: MIN_TOUCH_TARGET, minHeight: MIN_TOUCH_TARGET, alignItems: 'center', justifyContent: 'center', opacity: canNext ? 1 : 0.3 }}
+            >
+              <Text style={{ ...typography.body, color: colors.text }}>{en.calendarNextGlyph}</Text>
+            </Pressable>
+          </View>
 
-      {/* Subtitle */}
-      {grid.subtitle ? (
-        <Text style={{ ...typography.caption, color: colors.textMuted, textAlign: 'center', marginBottom: spacing.xs }}>
-          {grid.subtitle}
-        </Text>
-      ) : null}
+          <MonthGrid
+            grid={grid}
+            today={today}
+            periods={periods}
+            prediction={p}
+            monthLogs={logs}
+            system={system}
+            selected={selected}
+            onPressDay={handlePress}
+          />
+        </View>
+      </GestureDetector>
 
-      <MonthGrid
-        grid={grid}
+      <DaySheet
+        dateIso={selected}
         today={today}
+        system={system}
         periods={periods}
         prediction={p}
-        monthLogs={logs}
-        system={system}
-        onPressDay={handlePress}
+        log={selected ? logs[selected] ?? null : null}
+        onSelectFlow={(flow) => void handleSelectFlow(flow)}
+        onEditFull={() => {
+          if (selected) router.push(`/log/${selected}`);
+          setSelected(null);
+        }}
+        onClose={() => setSelected(null)}
       />
-
-      {/* Selected detail (future prediction, not log modal — §6.3) */}
-      {selected && selected > today && (
-        <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, padding: spacing.md, gap: spacing.sm, borderWidth: 1, borderColor: colors.border }}>
-          <Text style={{ ...typography.cardTitle, color: colors.text }}>{formatDate(selected, system)}</Text>
-          <Text style={{ ...typography.body, color: colors.text }}>
-            {p.ovulationDate === selected ? en.futureOvulation :
-             (selected >= p.fertileStart && selected <= p.fertileEnd) ? en.futureFertile :
-             (selected >= p.nextPeriodStart && selected <= p.nextPeriodEnd) ? en.futurePredictedPeriod :
-             en.futureNothing}
-          </Text>
-          <Pressable onPress={() => setSelected(null)} style={{ alignSelf: 'flex-start', padding: spacing.xs }}>
-            <Text style={{ ...typography.caption, color: colors.textMuted }}>{en.close}</Text>
-          </Pressable>
-        </View>
-      )}
-    </ScrollView>
+    </Screen>
   );
 }

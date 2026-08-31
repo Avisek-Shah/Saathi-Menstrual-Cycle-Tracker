@@ -22,6 +22,8 @@ interface DayCellProps {
   faded?: boolean;
   /** Hides the weekday letter above the circle — the month grid has its own header row. */
   hideWeekday?: boolean;
+  /** §6.3 — the day sheet's open date. Its own outer ring, distinct from today's inner ring. */
+  isSelected?: boolean;
 }
 
 export function DayCell({
@@ -33,6 +35,7 @@ export function DayCell({
   label,
   faded = false,
   hideWeekday = false,
+  isSelected = false,
 }: DayCellProps) {
   const d = parseISO(dateIso);
   const fill = fillFor(state);
@@ -42,6 +45,7 @@ export function DayCell({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={dateIso}
+      accessibilityState={{ disabled: disabled || !onPress, selected: isSelected }}
       disabled={disabled || !onPress}
       onPress={onPress}
       style={{ alignItems: 'center', gap: 4, opacity: disabled || faded ? 0.35 : 1 }}
@@ -53,21 +57,31 @@ export function DayCell({
       )}
       <View
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          width: 44,
+          height: 44,
+          borderRadius: 22,
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: fill,
-          borderWidth: isToday ? 2 : state === 'ovulation' ? 2 : 0,
-          borderColor: isToday ? colors.text : colors.ovulation,
+          borderWidth: isSelected ? 2 : 0,
+          borderColor: colors.primary,
         }}
       >
-        <Text
-          style={{ ...typography.body, color: onPrimary ? colors.surface : colors.text }}
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: fill,
+            borderWidth: isToday ? 2 : state === 'ovulation' ? 2 : 0,
+            borderColor: isToday ? colors.text : colors.ovulation,
+          }}
         >
-          {label ?? d.getDate()}
-        </Text>
+          <Text style={{ ...typography.body, color: onPrimary ? colors.surface : colors.text }}>
+            {label ?? d.getDate()}
+          </Text>
+        </View>
       </View>
       <View
         style={{

@@ -113,3 +113,58 @@ export async function deleteAll(): Promise<void> {
   await db.runAsync('DELETE FROM daily_logs');
   await refreshPeriods();
 }
+
+/**
+ * §6.7 re-seed rule — clear flow on the given dates only. Used after `reseedPlan()` (§6.7,
+ * core/onboarding.ts) has already excluded any day the user logged herself; this function
+ * trusts its caller and clears exactly the list it is given, nothing more.
+ *
+ * A row that becomes entirely empty (no flow, mood, symptoms, or note) is deleted outright
+ * rather than left as a bare placeholder row.
+ */
+export async function clearFlowForDates(dates: readonly string[]): Promise<void> {
+  if (dates.length === 0) return;
+  const db = await openDB();
+  const now = Date.now();
+  await db.withTransactionAsync(async () => {
+    for (const date of dates) {
+      const row = await db.getFirstAsync<RawLogRow>(
+        'SELECT * FROM daily_logs WHERE date = ?',
+        date,
+      );
+      if (!row) continue;
+      const moods = parseJsonArray(row.moods);
+      const symptoms = parseJsonArray(row.symptoms);
+      if (moods.length === 0 && symptoms.length === 0 && !row.note) {
+        await db.runAsync('DELETE FROM daily_logs WHERE date = ?', date);
+      } else {
+        await db.runAsync(
+          'UPDATE daily_logs SET flow = ?, updated_at = ? WHERE date = ?',
+          'none',
+          now,
+          date,
+        );
+      }
+    }
+  });
+  await refreshPeriods();
+}
+
+/**
+ * Most recent logged days, newest first, optionally before a given date (pagination for the
+ * §6.5 journal, and the source of "recent symptoms" for the §6.2 quick-log row).
+ */
+export async function getRecent(limit: number, before?: string): Promise<LogRow[]> {
+  const db = await openDB();
+  const rows = before
+    ? await db.getAllAsync<RawLogRow>(
+        'SELECT * FROM daily_logs WHERE date < ? ORDER BY date DESC LIMIT ?',
+        before,
+        limit,
+      )
+    : await db.getAllAsync<RawLogRow>(
+        'SELECT * FROM daily_logs ORDER BY date DESC LIMIT ?',
+        limit,
+      );
+  return rows.map(toLogRow);
+}

@@ -28,6 +28,13 @@ export interface OnboardingInput {
   birthYear: number | null;
 }
 
+/** §6.1 — the quick-choice chips offered beside the typed field on each answer step. */
+export const CYCLE_LENGTH_CHOICES = [26, 28, 30, 32] as const;
+export const PERIOD_LENGTH_CHOICES = [3, 4, 5, 6, 7] as const;
+export const START_DATE_CHOICE_OFFSETS = [0, 1, 3, 7, 14] as const;
+/** §6.1 step 5 — ages behind a handful of quick birth-year chips, alongside the typed field. */
+export const BIRTH_YEAR_QUICK_AGES = [15, 20, 25, 30, 40] as const;
+
 export interface OnboardingResult {
   settings: {
     onboarding_complete: true;
@@ -39,6 +46,72 @@ export interface OnboardingResult {
   seedLogs: { date: string; flow: string }[];
   /** The resolved period start — equals `lastPeriodStart`, or `today − cycleLength` when unsure. */
   anchorDate: string;
+}
+
+/** Why a typed value was rejected. `null` means it is usable. */
+export type NumberInputError = 'empty' | 'notANumber' | 'outOfRange';
+
+export interface NumberInputResult {
+  value: number | null;
+  error: NumberInputError | null;
+}
+
+/**
+ * §6.1 — parse what the user typed into an answer field. Never clamps: an out-of-range entry
+ * is reported so the UI can show the valid range and keep the previous value, rather than
+ * silently turning 60 into 45 behind her back.
+ */
+export function parseNumberInput(raw: string, min: number, max: number): NumberInputResult {
+  const trimmed = raw.trim();
+  if (trimmed === '') return { value: null, error: 'empty' };
+  if (!/^\d+$/.test(trimmed)) return { value: null, error: 'notANumber' };
+  const value = Number(trimmed);
+  if (value < min || value > max) return { value: null, error: 'outOfRange' };
+  return { value, error: null };
+}
+
+export interface DateChoice {
+  /** Days before `today`. 0 is today. */
+  offsetDays: number;
+  iso: string;
+}
+
+/** §6.1 step 2 — the quick chips beside the date picker. */
+export function quickDateChoices(
+  today: string,
+  offsets: readonly number[] = START_DATE_CHOICE_OFFSETS,
+): DateChoice[] {
+  return offsets.map((offsetDays) => ({ offsetDays, iso: addDays(today, -offsetDays) }));
+}
+
+/**
+ * §6.7 re-seed rule — what to change when the user corrects her last-period date.
+ *
+ * `protectedDates` are days carrying a mood, symptom, or note: the user has touched them, so
+ * their flow is hers and is never cleared. Days outside `oldRange` are never touched at all,
+ * which is what keeps this inside CLAUDE.md rule 10.
+ */
+export function reseedPlan(
+  oldRange: { start: string; end: string } | null,
+  newStart: string,
+  periodLength: number,
+  protectedDates: readonly string[] = [],
+): { clear: string[]; seed: { date: string; flow: string }[]; range: { start: string; end: string } } {
+  const seed = firstPeriodSeedLogs(newStart, periodLength);
+  const range = { start: newStart, end: seed[seed.length - 1].date };
+  const protectedSet = new Set(protectedDates);
+  const seededDates = new Set(seed.map((s) => s.date));
+
+  const clear: string[] = [];
+  if (oldRange) {
+    for (let iso = oldRange.start; iso <= oldRange.end; iso = addDays(iso, 1)) {
+      if (protectedSet.has(iso)) continue;
+      // A day that is about to be seeded again is rewritten, not cleared.
+      if (seededDates.has(iso)) continue;
+      clear.push(iso);
+    }
+  }
+  return { clear, seed, range };
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -71,6 +144,16 @@ export function firstPeriodSeedLogs(
 ): { date: string; flow: string }[] {
   const days = clamp(periodLength, PERIOD_LENGTH_MIN, PERIOD_LENGTH_MAX);
   return Array.from({ length: days }, (_, i) => ({ date: addDays(startDate, i), flow: 'medium' }));
+}
+
+/** §6.1 step 5 — a handful of birth-year chips beside the typed field, oldest last. */
+export function birthYearQuickChoices(
+  currentYear: number,
+  ages: readonly number[] = BIRTH_YEAR_QUICK_AGES,
+): number[] {
+  return ages
+    .map((age) => currentYear - age)
+    .filter((year) => year >= currentYear - BIRTH_YEAR_MAX_AGE && year <= currentYear - BIRTH_YEAR_MIN_AGE);
 }
 
 /** §6.1 step 5 — years from `currentYear − 9` down to `currentYear − 60`. */
