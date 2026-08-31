@@ -14,6 +14,12 @@ Format:
 
 ---
 
+## 2026-09-01 — Version bumped to 1.1.0; `versionCode` left at 1
+**Spec section:** BUILD_PLAN §8 "Versioning"
+**Decision:** `package.json`, `app.json` (`expo.version`), and `package-lock.json` bumped 1.0.0 → 1.1.0 (minor — the M10 UX pass and the calendar-highlight fix are new user-facing behaviour, not just a patch). `app.json`'s `android.versionCode` left at `1`.
+**Reason:** BUILD_PLAN's rule is "bump `versionCode` by 1 on every APK build without exception" — tied to an actual EAS build, not to every semver bump. No APK has been built under this version yet, so bumping it now would be a guess at a number with nothing behind it. It must be bumped at the next real `eas build`.
+**Reversible?** yes
+
 ## 2026-08-31 — Routes moved to `src/app/`
 **Spec section:** §13
 **Decision:** expo-router routes relocated from a root `app/` folder into `src/app/` to match the §13 project structure. Deleted the legacy `App.tsx`, `index.ts`, `index.js`; `package.json` `main` is now `expo-router/entry`. Deleted `app/index.tsx` (a redirect to a non-existent `/home` that also collided with `(tabs)/index`).
