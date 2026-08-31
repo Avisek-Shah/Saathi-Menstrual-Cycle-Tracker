@@ -9,12 +9,6 @@
         "buildType": "apk"
       },
       "channel": "preview"
-    },
-    "production": {
-      "distribution": "store",
-      "android": {
-        "buildType": "app-bundle"
-      }
     }
   }
 }

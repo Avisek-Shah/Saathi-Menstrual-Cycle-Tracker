@@ -1,14 +1,22 @@
-# Article 5 — How this app predicts your period
+# How this app predicts your period
 
-This app predicts your next period by averaging your recent cycles.
-It takes your last six completed cycles and weights the newer ones more
-(6, 5, 4, 3, 2, 1). The result is rounded and kept between 21 and 45 days.
+<!--
+  DRAFT — needs a human pass (BUILD_PLAN M8: article 5 is written by hand, and its wording
+  about irregular cycles is a §5.6 sensitive area). Keep it to plain sentences.
+-->
 
-It also assumes ovulation happens 14 days before the predicted next period.
-That is a fixed assumption — not a measurement of your body.
-Because of that assumption, the fertile window is a rough estimate
-and is not reliable as birth control.
+This app predicts your next period by looking at the dates you have already logged.
 
-If your cycles vary a lot (standard deviation over 7 days, or a range of 9+ days),
-the app says so clearly. It does not name a condition or suggest a cause.
-It only says that predictions are rough when cycles vary.
+It takes your last six completed cycles and averages their lengths, counting the most
+recent cycles more heavily than older ones. If your cycle has been changing, the app
+follows the change instead of holding you to an average from months ago. The result is
+rounded and kept within the normal range of 21 to 45 days. Until you have logged a few
+cycles, it leans on the typical cycle length you entered when you set up the app.
+
+For the fertile window, the app assumes ovulation happens about 14 days before your next
+period is due. That is a fixed assumption, not a measurement of your body, so the fertile
+window is a rough estimate. It is not reliable as a way to avoid or plan a pregnancy.
+
+When your recent cycles vary widely from one to the next, the app tells you so and shows a
+date range instead of a single day. It does not name a cause or a condition — it is only
+describing how certain its own guess is.

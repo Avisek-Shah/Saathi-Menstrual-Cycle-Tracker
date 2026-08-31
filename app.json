@@ -2,11 +2,14 @@
   "expo": {
     "name": "Saathi",
     "slug": "saathi",
+    "scheme": "saathi",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "platforms": ["android", "ios"],
+    "plugins": ["expo-router"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.yourname.saathi"
@@ -22,9 +25,6 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
     },
     "updates": {
       "url": "https://u.expo.dev/630bb785-914e-4ac9-be71-36e44c50a2d2"
