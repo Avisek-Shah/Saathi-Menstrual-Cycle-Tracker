@@ -35,6 +35,26 @@ export const en = {
   settingsCalendarSystem: 'Calendar system',
   settingsNotifications: 'Notifications',
 
+  // Onboarding (§6.1). {n} filled via `fill`.
+  onboardingWelcomeTitle: 'Saathi',
+  onboardingWelcomeWhat: 'Track your cycle, and see when your next period and fertile window are likely.',
+  onboardingWelcomePrivacy: 'Everything you enter stays on this phone. There is no account and nothing is sent anywhere.',
+  onboardingStartTitle: 'When did your last period start?',
+  onboardingStartHelp: 'Pick the day the bleeding began.',
+  onboardingStartNotSure: "I'm not sure",
+  onboardingCycleTitle: 'How long is your typical cycle?',
+  onboardingCycleHelp: 'Count from the first day of one period to the first day of the next. Most are 24 to 35 days.',
+  onboardingCycleUnit: '{n} days',
+  onboardingDontKnow: "I don't know",
+  onboardingPeriodTitle: 'How many days does your period usually last?',
+  onboardingPeriodHelp: 'Count the days you have any bleeding.',
+  onboardingBirthYearTitle: 'Which year were you born?',
+  onboardingBirthYearHelp: 'Used only to tailor a few tips. It is never shown back as your age.',
+  onboardingBack: 'Back',
+  onboardingNext: 'Next',
+  onboardingSkip: 'Skip',
+  onboardingFinish: 'Finish',
+
   // Log modal (§6.4).
   logFlow: 'Flow',
   logMood: 'Mood',
