@@ -70,9 +70,9 @@ Every library in this table is already installed. The M10 UX pass (§16) adds **
 - **Cycle day 1** = the first day of a period.
 - **Cycle length** = number of days from one period's start to the next period's start. A cycle only exists once a *following* period has started.
 - **Period length** = number of consecutive days of bleeding within one period.
-- **Ovulation (estimated)** = predicted next period start − 14 days (fixed luteal phase assumption).
-- **Fertile window (estimated)** = ovulation − 5 days through ovulation + 1 day (6 days inclusive).
-- **Valid cycle length** = 21–45 days inclusive. Anything outside this is stored but excluded from averages (§5.3).
+- **Ovulation (estimated)** = predicted next period start − 14 days (fixed luteal phase assumption). 14 days is the standard calendar-method figure — average luteal phase is 12–14 days ([Cleveland Clinic](https://my.clevelandclinic.org/health/articles/24417-luteal-phase)) and calendar predictors conventionally use 14 ([Mayo Clinic Press](https://mcpress.mayoclinic.org/pregnancy/finding-your-fertility-window/)).
+- **Fertile window (estimated)** = ovulation − 5 days through ovulation + 1 day — **7 days inclusive**. (Corrected 2026-08-31: this range was previously mislabeled "6 days inclusive" in this document; the code always computed 7. See DECISIONS.md.) This matches consumer clinical guidance of "5 days before ovulation, plus the day of, plus the day after" ([Hopkins Medicine](https://www.hopkinsmedicine.org/health/wellness-and-prevention/calculating-your-monthly-fertility-window)); ASRM's stricter committee-opinion figure is a 6-day window ending at ovulation with no day after ([ASRM 2022](https://www.asrm.org/practice-guidance/practice-committee-documents/optimizing-natural-fertility-a-committee-opinion-2021/)) — both appear in the literature, and this app uses the 7-day figure.
+- **Valid cycle length** = 21–45 days inclusive. Anything outside this is stored but excluded from averages (§5.3). This is a data-quality bound, not a clinical "normal" claim — ACOG's own definition of a *normal* cycle is 21–35 days ([Cleveland Clinic summarizing ACOG](https://my.clevelandclinic.org/health/diseases/14633-abnormal-menstruation-periods)), narrower than the app's 21–45. The wider band here exists so a real cycle outside the textbook range (common with PCOS or perimenopause) still contributes to the visible history — it is simply excluded from the *average*, not hidden.
 - **Valid period length** = 1–10 days inclusive.
 - All dates are stored as `YYYY-MM-DD` strings in **Gregorian**, in the device's local timezone. Bikram Sambat exists only at the presentation layer. **Never store a BS date.**
 - "Today" is computed once per render pass from local device time. Handle the app being left open across midnight by re-checking on app foreground.
@@ -229,6 +229,8 @@ Using the last 6 non-outlier cycles, mark `isIrregular = true` if **either**:
 - the standard deviation of cycle lengths is **> 7 days**, or
 - `max − min` across those cycles is **≥ 9 days**.
 
+(This 7–9 day band is not arbitrary — it mirrors ACOG's own definition of irregular: "cycle length varies by more than 7 to 9 days" ([Cleveland Clinic summarizing ACOG](https://my.clevelandclinic.org/health/diseases/14633-abnormal-menstruation-periods)).)
+
 Also set `isIrregular = true` if any of the last 3 cycles was an outlier (outside 21–45).
 
 `predictionWindow` (the ± shown to the user):
@@ -344,16 +346,17 @@ Save and cancel in the header. Save writes `daily_logs`, triggers `recomputePeri
 
 ### 6.5 Insights
 
-Four sections, each in a card:
+Five sections, each in a card, in order:
 
-1. **Stats** — average cycle length, average period length, shortest and longest cycle, number of cycles tracked. When fewer than 2 cycles exist, show a "keep logging to see your patterns" state instead of zeros.
-2. **Charts**
+1. **Cycle overview** (M10) — the single glanceable summary: last period (dates + length), next period (date or range), ovulation date, fertile window (dates), and where today sits in the current cycle ("Cycle day N"). Every value is read straight from the `Period[]` / `Prediction` §5 already computes — no new calculation, just one clear place all of it is shown together, so a user does not have to piece it together from Home and the calendar. Low confidence shows the same "estimate — keep logging" note as Home.
+2. **Stats** — average cycle length, average period length, shortest and longest cycle, number of cycles tracked. When fewer than 2 cycles exist, show a "keep logging to see your patterns" state instead of zeros.
+3. **Charts**
    - *Cycle length over time*: bar chart, one bar per completed cycle, most recent 12. Horizontal line at the user's average. Outlier bars in a muted colour.
    - *Period length over time*: bar chart, same window.
    - *Symptom frequency*: horizontal bars, top 6 symptoms by count over the last 90 days.
    - Every chart needs an explicit empty state with the minimum data required stated ("needs at least 2 completed cycles").
-3. **Cycle history** — list, newest first: start date, end date, period length, cycle length, outlier badge. Tapping a row jumps the Calendar tab to that month.
-4. **Journal** — the readable record of what was logged, newest first, grouped by month. Each row: the date per `calendar_system`, a flow marker, mood and symptom chips, and the first line of any note. Tapping a row opens that day's log modal. Loads a page at a time rather than the whole history. Its empty state names what would appear here, so the section explains itself before there is any data in it.
+4. **Cycle history** — list, newest first: start date, end date, period length, cycle length, outlier badge. Tapping a row jumps the Calendar tab to that month.
+5. **Journal** — the readable record of what was logged, newest first, grouped by month. Each row: the date per `calendar_system`, a flow marker, mood and symptom chips, and the first line of any note. Tapping a row opens that day's log modal. Loads a page at a time rather than the whole history. Its empty state names what would appear here, so the section explains itself before there is any data in it.
 
 ### 6.6 Learn (accessible from Insights, not a tab)
 
@@ -652,6 +655,7 @@ v1 is done when all of these are true:
 - [ ] In BS mode the calendar opens on the current Nepali month with today ringed, and the Today control returns to it from any month
 - [ ] Tapping any day in the calendar opens the day sheet; a one-tap flow from that sheet updates the grid immediately
 - [ ] The journal in Insights lists a day logged moments earlier, newest first
+- [ ] Insights → Cycle overview shows last period, next period, ovulation, and fertile window together in one card, matching Home's own numbers exactly
 
 ---
 
@@ -671,7 +675,7 @@ Full detail in `BUILD_PLAN.md`. Summary:
 | **M7** | Settings, notifications, PIN lock, export, delete-all |
 | **M8** | Learn articles |
 | **M9** | Edge cases (§10), accessibility pass, EAS APK build, expo-updates wiring |
-| **M10** | UX pass: safe areas (§11.6), onboarding input + editable profile (§6.1, §6.7), calendar day sheet and swipe (§6.3), Home quick-log (§6.2), log reframe (§6.4), journal (§6.5), motion (§11.7) |
+| **M10** | UX pass: safe areas (§11.6), onboarding input + editable profile (§6.1, §6.7), calendar day sheet and swipe (§6.3), Home quick-log (§6.2), log reframe (§6.4), journal + cycle overview (§6.5), motion (§11.7) |
 
 M2 before M4 is deliberate — the prediction logic is the product, and it should be correct in isolation before any screen depends on it.
 

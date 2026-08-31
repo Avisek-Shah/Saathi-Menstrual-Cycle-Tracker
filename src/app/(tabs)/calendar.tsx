@@ -7,6 +7,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { addMonth, currentBsMonth, currentBsYear, getMonthGrid, type CalendarSystem } from '../../core/calendar';
 import { DaySheet } from '../../components/cycle/DaySheet';
 import { MonthGrid } from '../../components/cycle/MonthGrid';
+import { MonthNavButton } from '../../components/ui/MonthNavButton';
 import { Screen } from '../../components/ui/Screen';
 import { en } from '../../i18n/en';
 import { todayIso } from '../../services/clock';
@@ -155,26 +156,18 @@ export default function CalendarScreen() {
               paddingHorizontal: spacing.md,
             }}
           >
-            <Pressable
-              accessibilityRole="button"
+            <MonthNavButton
+              glyph={en.calendarPrevGlyph}
               accessibilityLabel={en.calendarPrevMonth}
               disabled={!canPrev}
               onPress={() => goMonth(-1)}
-              hitSlop={8}
-              style={{ minWidth: MIN_TOUCH_TARGET, minHeight: MIN_TOUCH_TARGET, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Text style={{ ...typography.body, color: colors.text }}>{en.calendarPrevGlyph}</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
+            />
+            <MonthNavButton
+              glyph={en.calendarNextGlyph}
               accessibilityLabel={en.calendarNextMonth}
               disabled={!canNext}
               onPress={() => goMonth(1)}
-              hitSlop={8}
-              style={{ minWidth: MIN_TOUCH_TARGET, minHeight: MIN_TOUCH_TARGET, alignItems: 'center', justifyContent: 'center', opacity: canNext ? 1 : 0.3 }}
-            >
-              <Text style={{ ...typography.body, color: colors.text }}>{en.calendarNextGlyph}</Text>
-            </Pressable>
+            />
           </View>
 
           <MonthGrid

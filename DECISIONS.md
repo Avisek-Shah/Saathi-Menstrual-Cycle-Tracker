@@ -120,6 +120,24 @@ Format:
 **Reason:** §6.2 names "the flow level" and "most-used recent symptoms" without a value or window; §6.5 says the journal "loads a page at a time" without a size. Picked the simplest defensible number in each case — a representative flow level, one cycle's worth of history, a few weeks per page — and marked each at its `// SPEC:` comment.
 **Reversible?** yes
 
+## 2026-08-31 — §3 fertile-window day count corrected; algorithm validated against medical sources
+**Spec section:** §3, §5.2, §5.5
+**Decision:** Fixed a documentation-only bug: §3 described the fertile window (ovulation−5 … ovulation+1) as "6 days inclusive"; the correct count is 7, and `core/prediction.ts` was already computing 7 — only the prose was wrong. Researched the underlying numbers against medical sources before touching anything: 14-day luteal assumption matches Cleveland Clinic/Mayo Clinic Press; the 7-day fertile window matches Hopkins Medicine's consumer guidance (ASRM's stricter clinical figure is 6 days, ending at ovulation — both exist in the literature, kept the 7-day one already in code); the §5.5 irregularity thresholds (sd>7, range≥9) already match ACOG's own "varies by more than 7 to 9 days" definition. Added citations inline in §3/§5.5. No algorithm values changed — the existing numbers were already authentic, not guessed.
+**Reason:** User asked that predictions be verified against real medical guidance, not assumed. Per CLAUDE.md rule 1, flagged the discrepancy and confirmed with the user before editing rather than silently rewriting the spec.
+**Reversible?** yes — corrects a description to match already-shipped, now-verified behaviour; no user-facing number changed.
+
+## 2026-08-31 — Cycle overview card added to Insights (§6.5)
+**Spec section:** §6.5
+**Decision:** New `CycleOverviewCard` at the top of Insights showing last period, next period, ovulation, and fertile window together, sourced from the same `Period[]`/`Prediction` Home already uses — no new calculation. Placed in Insights (not a new Home card, not a full Insights-as-dashboard redesign) per the user's explicit choice between the three options offered.
+**Reason:** User's stated goal for the app is that last/next period, fertile window, ovulation, and cycle stats be clearly visible in one place; before this, ovulation date and last-period dates existed nowhere as an explicit line, only implied across Home's status card and the fertile card.
+**Reversible?** yes
+
+## 2026-08-31 — Calendar month-nav buttons redone as `MonthNavButton`
+**Spec section:** §6.3, §11.6
+**Decision:** The prev/next month controls (calendar tab and the onboarding/profile date picker) are now a filled circular button with a border and shadow, not a bare small glyph on the background. Extracted as a shared `components/ui/MonthNavButton.tsx` so both surfaces match.
+**Reason:** User reported the controls read as too small/unclear to be buttons on a real device, despite already meeting the 44×44 touch-target minimum — the touch target was fine, the visual affordance was not.
+**Reversible?** yes
+
 ## 2026-08-31 — BUILD_PLAN corrected: M6, M7, M8 are not built
 **Spec section:** BUILD_PLAN §6b
 **Decision:** Recorded in BUILD_PLAN that Insights charts (M6), the notification/PIN/export services (M7), and five of the six Learn articles (M8) do not exist in the repository despite commits describing them as complete. Settings rows for unbuilt features render disabled.

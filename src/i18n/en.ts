@@ -39,6 +39,15 @@ export const en = {
   settingsCalendarSystem: 'Calendar system',
   settingsNotifications: 'Notifications',
 
+  // Insights → Cycle overview (§6.5, M10) — the single glanceable summary the user asked for:
+  // last period, next period, ovulation, fertile window, cycle day, all in one place.
+  overviewTitle: 'Cycle overview',
+  overviewLastPeriod: 'Last period',
+  overviewNextPeriod: 'Next period',
+  overviewOvulation: 'Ovulation',
+  overviewCycleDayLabel: 'Cycle day',
+  overviewNoPeriodYet: 'Not logged yet',
+
   // Insights → Journal (§6.5, M10).
   insightsJournalTitle: 'Journal',
   journalEmpty: 'Days you log will show up here, newest first.',

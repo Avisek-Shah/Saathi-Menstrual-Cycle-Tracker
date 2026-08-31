@@ -5,11 +5,13 @@ import { Text } from 'react-native';
 import type { JournalRow } from '../../core/journal';
 import { Card } from '../../components/ui/Card';
 import { Screen } from '../../components/ui/Screen';
+import { CycleOverviewCard } from '../../components/cycle/CycleOverviewCard';
 import { JournalTimeline } from '../../components/cycle/JournalTimeline';
 import * as dailyLogs from '../../db/repositories/dailyLogs';
 import { en, fill } from '../../i18n/en';
 import { useCycleStore } from '../../stores/useCycleStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import { todayIso } from '../../services/clock';
 import { colors } from '../../theme/colors';
 import { spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
@@ -43,7 +45,8 @@ function toJournalRow(row: dailyLogs.LogRow): JournalRow {
 export default function InsightsScreen() {
   const router = useRouter();
   const system = useSettingsStore((s) => s.settings.calendar_system);
-  const { prediction, ready } = useCycleStore();
+  const { prediction, periods, ready } = useCycleStore();
+  const today = todayIso();
 
   const [journalRows, setJournalRows] = useState<JournalRow[]>([]);
   const [journalDone, setJournalDone] = useState(false);
@@ -101,6 +104,8 @@ export default function InsightsScreen() {
 
   return (
     <Screen title={en.insights} bottomInset gap={spacing.lg}>
+      <CycleOverviewCard periods={periods} prediction={prediction} today={today} system={system} />
+
       {!hasEnough ? (
         <Card>
           <Text style={{ ...typography.body, color: colors.textMuted }}>{en.insightsEmptyStats}</Text>

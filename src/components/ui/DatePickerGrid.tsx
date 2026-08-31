@@ -11,8 +11,9 @@ import {
 } from '../../core/calendar';
 import { en } from '../../i18n/en';
 import { colors } from '../../theme/colors';
-import { MIN_TOUCH_TARGET, radius, spacing } from '../../theme/spacing';
+import { radius, spacing } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
+import { MonthNavButton } from './MonthNavButton';
 
 interface DatePickerGridProps {
   system: CalendarSystem;
@@ -54,35 +55,17 @@ export function DatePickerGrid({ system, today, value, onSelect, isSelectable }:
           paddingBottom: spacing.xs,
         }}
       >
-        <Pressable
-          accessibilityRole="button"
+        <MonthNavButton
+          glyph={en.calendarPrevGlyph}
           accessibilityLabel={en.calendarPrevMonth}
-          hitSlop={8}
           onPress={() => setCursor(addMonth(cursor.year, cursor.month, -1))}
-          style={{
-            minWidth: MIN_TOUCH_TARGET,
-            minHeight: MIN_TOUCH_TARGET,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ ...typography.body, color: colors.text }}>{en.calendarPrevGlyph}</Text>
-        </Pressable>
+        />
         <Text style={{ ...typography.cardTitle, color: colors.text }}>{grid.title}</Text>
-        <Pressable
-          accessibilityRole="button"
+        <MonthNavButton
+          glyph={en.calendarNextGlyph}
           accessibilityLabel={en.calendarNextMonth}
-          hitSlop={8}
           onPress={() => setCursor(addMonth(cursor.year, cursor.month, 1))}
-          style={{
-            minWidth: MIN_TOUCH_TARGET,
-            minHeight: MIN_TOUCH_TARGET,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Text style={{ ...typography.body, color: colors.text }}>{en.calendarNextGlyph}</Text>
-        </Pressable>
+        />
       </View>
 
       <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>

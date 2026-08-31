@@ -202,55 +202,63 @@ Spec: §6.1, §6.2, §6.3, §6.3.1, §6.4, §6.5, §6.7, §10.10–13, §11.6, �
 
 **Step 1 — safe areas (do first; it is the blocking bug)**
 
-- [ ] `SafeAreaProvider` + `GestureHandlerRootView` + `StatusBar` in the root layout
-- [ ] One `Screen` wrapper component applying insets; every tab, the modal, and onboarding go through it
-- [ ] Tab bar height includes `insets.bottom`
-- [ ] Onboarding footer clears the gesture bar; controls ≥ 48px; Next responds on the first tap on a gesture-nav phone
+- [x] `SafeAreaProvider` + `GestureHandlerRootView` + `StatusBar` in the root layout
+- [x] One `Screen` wrapper component applying insets; every tab, the modal, and onboarding go through it
+- [x] Tab bar height includes `insets.bottom`
+- [x] Onboarding footer clears the gesture bar; controls ≥ 48px; Next responds on the first tap on a gesture-nav phone
 
 **Step 2 — onboarding input**
 
-- [ ] Pure helpers in `core/onboarding.ts`: numeric input parsing, quick date choices, quick length choices — with tests
-- [ ] `TextField` and `DatePickerGrid` components; the grid reuses `getMonthGrid`
-- [ ] Every answer step offers chips **and** a typed field, with inline validation
-- [ ] `onboarding_seed_range` written on finish
+- [x] Pure helpers in `core/onboarding.ts`: numeric input parsing, quick date choices, quick length choices — with tests
+- [x] `TextField` and `DatePickerGrid` components; the grid reuses `getMonthGrid`
+- [x] Every answer step offers chips **and** a typed field, with inline validation
+- [x] `onboarding_seed_range` written on finish
 
 **Step 3 — editable profile**
 
-- [ ] Settings → My cycle screen editing all onboarding answers
-- [ ] Pure `reseedPlan` + repository `clearFlowForRange`, with tests for the protected-day rule
-- [ ] Anchor change confirms first, then recomputes; no user-logged day is destroyed
-- [ ] Settings rebuilt into grouped sections; unbuilt M7 rows shown disabled
+- [x] Settings → My cycle screen editing all onboarding answers
+- [x] Pure `reseedPlan` + repository `clearFlowForDates`, with tests for the protected-day rule
+- [x] Anchor change confirms first, then recomputes; no user-logged day is destroyed
+- [x] Settings rebuilt into grouped sections; unbuilt M7 rows shown disabled
 
 **Step 4 — calendar**
 
-- [ ] Opening month derived from `today` via `currentBsYear`/`currentBsMonth` — every hardcoded year/month constant removed
-- [ ] Today ringed in AD and BS; Today control returns to the current month
-- [ ] Horizontal swipe between months, capped at current + 3 via `monthWindow`
-- [ ] Day sheet on tap: state line, logged summary, one-tap flow, edit full log; read-only for future dates
-- [ ] One title, one legend
+- [x] Opening month derived from `today` via `currentBsYear`/`currentBsMonth` — every hardcoded year/month constant removed
+- [x] Today ringed in AD and BS; Today control returns to the current month
+- [x] Horizontal swipe between months, capped at current + 3 via `monthWindow`
+- [x] Day sheet on tap: state line, logged summary, one-tap flow, edit full log; read-only for future dates
+- [x] One title, one legend
+- [x] Prev/next month controls redone as a visible `MonthNavButton` (filled circle) — the bare glyph read as too small to be a button
 
 **Step 5 — Home quick-log**
 
-- [ ] Pure `core/quickLog.ts` with merge semantics, tested
-- [ ] Quick-log chip row on Home, gated by `quick_log_enabled`
+- [x] Pure `core/quickLog.ts` with merge semantics, tested
+- [x] Quick-log chip row on Home, gated by `quick_log_enabled`
 
 **Step 6 — log reframe**
 
-- [ ] Flow first as large labelled buttons; mood/symptoms/note behind "Add more"
-- [ ] One-time explainer gated by `log_explainer_seen`
-- [ ] Three-tap path re-verified: open → flow → save
+- [x] Flow first as large labelled buttons; mood/symptoms/note behind "Add more"
+- [x] One-time explainer gated by `log_explainer_seen`
+- [x] Three-tap path re-verified: open → flow → save
 
 **Step 7 — journal**
 
-- [ ] Pure `core/journal.ts` grouping, tested
-- [ ] Journal section in Insights, paginated, tap-through to the day
+- [x] Pure `core/journal.ts` grouping, tested
+- [x] Journal section in Insights, paginated, tap-through to the day
+
+**Step 7b — cycle overview (added 2026-08-31, §6.5)**
+
+- [x] `CycleOverviewCard` at the top of Insights: last period, next period, ovulation, fertile window, cycle day — one glanceable card, sourced from the same `Period[]`/`Prediction` Home already uses
+- [x] Shared `Row`/`Divider` (`components/ui/Row.tsx`) so the overview and Settings read as one visual language
 
 **Step 8 — visual polish**
 
-- [ ] Elevation tokens; palette unchanged (§11.2)
-- [ ] Status card hero with an SVG cycle-day ring
-- [ ] Transitions ≤ 200 ms, disabled under reduce-motion
-- [ ] Every new string in `src/i18n/en.ts`
+- [x] Elevation tokens (`theme/elevation.ts`); palette unchanged (§11.2)
+- [x] Card / StatusCard shadow depth
+- [x] `MonthNavButton` — calendar and date-picker month controls are now a filled circular button, not a bare small glyph
+- [ ] Status card hero with an SVG cycle-day ring — **not built**; `react-native-svg` is available but this specific visual wasn't done in this pass
+- [ ] Reanimated transitions ≤ 200 ms, disabled under reduce-motion — **not built**; screens change state instantly, no animation layer added yet
+- [x] Every new string in `src/i18n/en.ts`
 
 **Done when:** the new §15 acceptance boxes pass on a real gesture-navigation phone, `npm test` and `npm run typecheck` are green, and the sensitive copy in §5.6, §6.2, §7, and §8 is byte-identical to before the pass.
 
