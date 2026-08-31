@@ -202,7 +202,7 @@ export const en = {
   legendPredicted: 'Predicted',
   legendFertile: 'Fertile',
   legendOvulation: 'Ovulation',
-  legendLogged: 'Logged',
+  legendLogged: 'Log (no flow)',
   legendToday: 'Today',
   calendarPrevMonth: 'Previous month',
   calendarNextMonth: 'Next month',

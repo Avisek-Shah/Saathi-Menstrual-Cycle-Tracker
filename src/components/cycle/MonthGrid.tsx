@@ -3,6 +3,7 @@ import type { MonthGrid, MonthCell } from '../../core/calendar';
 import { formatDate } from '../../core/calendar';
 import { dayCellState } from '../../core/home';
 import { colors } from '../../theme/colors';
+import { en } from '../../i18n/en';
 import { typography } from '../../theme/typography';
 import { spacing } from '../../theme/spacing';
 import type { Period } from '../../core/periods';
@@ -96,18 +97,20 @@ export function MonthGrid({
 }
 
 function LegendRow() {
+  // §12 rule 6 — labels come from `en`, not literals. Ovulation's swatch is now the same
+  // solid `ovulationFill` the day cell itself uses (§11.2), not a ring on the fertile wash.
   const items = [
-    { label: 'Period', color: colors.primary },
-    { label: 'Predicted', color: colors.primaryMuted },
-    { label: 'Fertile', color: colors.fertileMuted },
-    { label: 'Ovulation', color: colors.fertileMuted, ring: true },
-    { label: 'Log (no flow)', color: colors.surface, dot: true },
+    { label: en.legendPeriod, color: colors.primary },
+    { label: en.legendPredicted, color: colors.primaryMuted },
+    { label: en.legendFertile, color: colors.fertileMuted },
+    { label: en.legendOvulation, color: colors.ovulationFill },
+    { label: en.legendLogged, color: colors.surface, dot: true },
   ];
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, padding: spacing.md, paddingTop: spacing.xs }}>
       {items.map((it) => (
         <View key={it.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: it.color, borderWidth: it.ring ? 1.5 : 0, borderColor: colors.ovulation }} />
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: it.color, borderWidth: it.color === colors.surface ? 1 : 0, borderColor: colors.border }} />
           {it.dot ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.textMuted }} /> : null}
           <Text style={{ ...typography.caption, color: colors.textMuted }}>{it.label}</Text>
         </View>

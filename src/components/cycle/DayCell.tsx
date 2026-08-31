@@ -39,7 +39,9 @@ export function DayCell({
 }: DayCellProps) {
   const d = parseISO(dateIso);
   const fill = fillFor(state);
-  const onPrimary = state === 'loggedPeriod';
+  // Solid-filled states get white text — a filled circle reads as "this happened / is
+  // estimated firmly", vs. the pale wash used for a merely predicted or fertile day.
+  const onSolid = state === 'loggedPeriod' || state === 'ovulation';
 
   return (
     <Pressable
@@ -74,11 +76,14 @@ export function DayCell({
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: fill,
-            borderWidth: isToday ? 2 : state === 'ovulation' ? 2 : 0,
-            borderColor: isToday ? colors.text : colors.ovulation,
+            // §11.2 — the ovulation day now carries its own solid colour (see `fillFor`), so
+            // it no longer needs a ring to stand apart from the fertile wash; only "today"
+            // still uses this ring.
+            borderWidth: isToday ? 2 : 0,
+            borderColor: colors.text,
           }}
         >
-          <Text style={{ ...typography.body, color: onPrimary ? colors.surface : colors.text }}>
+          <Text style={{ ...typography.body, color: onSolid ? colors.surface : colors.text }}>
             {label ?? d.getDate()}
           </Text>
         </View>
@@ -95,7 +100,8 @@ export function DayCell({
   );
 }
 
-// §11.2 — colour is never the only signal; each state also carries a ring or a dot.
+// §11.2 — colour is never the only signal; each state also carries a ring or a dot. Solid
+// fills (`loggedPeriod`, `ovulation`) additionally carry white text (see `onSolid` above).
 function fillFor(state: DayCellState): string {
   switch (state) {
     case 'loggedPeriod':
@@ -103,8 +109,9 @@ function fillFor(state: DayCellState): string {
     case 'predictedPeriod':
       return colors.primaryMuted;
     case 'fertile':
-    case 'ovulation':
       return colors.fertileMuted;
+    case 'ovulation':
+      return colors.ovulationFill;
     default:
       return colors.surface;
   }

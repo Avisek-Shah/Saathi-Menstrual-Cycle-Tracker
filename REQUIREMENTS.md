@@ -477,16 +477,19 @@ Soft, conventional period-app aesthetic. Warm and calm, not clinical, not childi
 | `bg` | `#FFF9FB` | App background |
 | `surface` | `#FFFFFF` | Cards |
 | `primary` | `#E8637C` | Period days, primary buttons |
-| `primaryMuted` | `#F9D4DC` | Predicted period days |
-| `fertile` | `#7FB3A8` | Fertile window |
-| `fertileMuted` | `#D6E9E4` | Fertile window fill |
-| `ovulation` | `#4E8D80` | Ovulation day marker |
+| `primaryMuted` | `#F0A0B6` | Predicted period days |
+| `fertile` | `#7FB3A8` | Fertile window (accent use, e.g. card text) |
+| `fertileMuted` | `#9FD0C2` | Fertile window fill |
+| `ovulation` | `#4E8D80` | Ovulation accent (non-fill uses) |
+| `ovulationFill` | `#3A6A5F` | Ovulation day-cell solid fill, paired with white text |
 | `text` | `#2E2A2C` | Primary text |
 | `textMuted` | `#7C7378` | Secondary text |
 | `border` | `#F0E4E8` | Dividers |
 | `warning` | `#D9A441` | Outlier / irregular markers |
 
-**Day-cell states:** logged period (`primary` fill), predicted period (`primaryMuted` fill), fertile (`fertileMuted` fill), ovulation (`fertileMuted` fill + `ovulation` ring), today (2px `text` ring, layered over any other state), logged-but-no-flow (small `textMuted` dot).
+**Day-cell states:** logged period (`primary` fill, white text), predicted period (`primaryMuted` fill), fertile (`fertileMuted` fill), ovulation (`ovulationFill` — solid, white text, same treatment as a logged period), today (2px `text` ring, layered over any other state), logged-but-no-flow (small `textMuted` dot). (Revised 2026-08-31 — ovulation previously shared `fertileMuted` with a thin ring; the ring was too subtle to read as informational at a glance, so ovulation now gets its own solid colour the way a logged period does. See DECISIONS.md.)
+
+Every fill/text pairing on this page is checked against WCAG AA (4.5:1) for the text colour it actually sits behind, not picked by eye — see the comment above the `colors` object in `src/theme/colors.ts`.
 
 Colour must never be the only carrier of meaning — every state also has a shape, ring, or dot.
 
