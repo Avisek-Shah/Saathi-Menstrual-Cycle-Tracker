@@ -13,24 +13,27 @@ interface DayCellProps {
   isToday: boolean;
   onPress?: () => void;
   disabled?: boolean;
+  /**
+   * Number shown in the circle. Defaults to the Gregorian day-of-month. The calendar grid
+   * passes the BS day-of-month in BS mode (§9 — the grid re-grids, it does not relabel).
+   */
+  label?: number;
+  /** Dimmed: a neighbouring month's day filling the corner of a month grid. */
+  faded?: boolean;
+  /** Hides the weekday letter above the circle — the month grid has its own header row. */
+  hideWeekday?: boolean;
 }
 
-// §11.2 — colour is never the only signal; each state also carries a ring or a dot.
-function fillFor(state: DayCellState): string {
-  switch (state) {
-    case 'loggedPeriod':
-      return colors.primary;
-    case 'predictedPeriod':
-      return colors.primaryMuted;
-    case 'fertile':
-    case 'ovulation':
-      return colors.fertileMuted;
-    default:
-      return colors.surface;
-  }
-}
-
-export function DayCell({ dateIso, state, isToday, onPress, disabled = false }: DayCellProps) {
+export function DayCell({
+  dateIso,
+  state,
+  isToday,
+  onPress,
+  disabled = false,
+  label,
+  faded = false,
+  hideWeekday = false,
+}: DayCellProps) {
   const d = parseISO(dateIso);
   const fill = fillFor(state);
   const onPrimary = state === 'loggedPeriod';
@@ -41,11 +44,13 @@ export function DayCell({ dateIso, state, isToday, onPress, disabled = false }: 
       accessibilityLabel={dateIso}
       disabled={disabled || !onPress}
       onPress={onPress}
-      style={{ alignItems: 'center', gap: 4, opacity: disabled ? 0.35 : 1 }}
+      style={{ alignItems: 'center', gap: 4, opacity: disabled || faded ? 0.35 : 1 }}
     >
-      <Text style={{ ...typography.caption, color: colors.textMuted }}>
-        {WEEKDAY[d.getDay()]}
-      </Text>
+      {hideWeekday ? null : (
+        <Text style={{ ...typography.caption, color: colors.textMuted }}>
+          {WEEKDAY[d.getDay()]}
+        </Text>
+      )}
       <View
         style={{
           width: 40,
@@ -61,7 +66,7 @@ export function DayCell({ dateIso, state, isToday, onPress, disabled = false }: 
         <Text
           style={{ ...typography.body, color: onPrimary ? colors.surface : colors.text }}
         >
-          {d.getDate()}
+          {label ?? d.getDate()}
         </Text>
       </View>
       <View
@@ -74,4 +79,19 @@ export function DayCell({ dateIso, state, isToday, onPress, disabled = false }: 
       />
     </Pressable>
   );
+}
+
+// §11.2 — colour is never the only signal; each state also carries a ring or a dot.
+function fillFor(state: DayCellState): string {
+  switch (state) {
+    case 'loggedPeriod':
+      return colors.primary;
+    case 'predictedPeriod':
+      return colors.primaryMuted;
+    case 'fertile':
+    case 'ovulation':
+      return colors.fertileMuted;
+    default:
+      return colors.surface;
+  }
 }

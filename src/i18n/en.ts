@@ -32,6 +32,10 @@ export const en = {
   // Placeholder screens — replaced by their milestone (M4–M7).
   comingSoon: 'Coming soon',
   insightsEmptyStats: 'Keep logging to see your patterns (needs 2 or more cycles)',
+  insightsAvgCycle: 'Average cycle',
+  insightsAvgPeriod: 'Average period',
+  insightsDays: '{n} days',
+  insightsCyclesUsed: 'Based on {n} cycles',
   settingsCalendarSystem: 'Calendar system',
   settingsNotifications: 'Notifications',
 
@@ -121,6 +125,23 @@ export const en = {
   symptom_insomnia: 'Insomnia',
   symptom_dizziness: 'Dizziness',
   symptom_spotting_between: 'Spotting between periods',
+
+  // Calendar (§6.3). Legend labels mirror the §11.2 day-cell states.
+  legendPeriod: 'Period',
+  legendPredicted: 'Predicted',
+  legendFertile: 'Fertile',
+  legendOvulation: 'Ovulation',
+  legendLogged: 'Logged',
+  legendToday: 'Today',
+  calendarPrevMonth: 'Previous month',
+  calendarNextMonth: 'Next month',
+  // Future-date detail (§6.3) — shown instead of the log modal.
+  futureNotLoggable: "This day hasn't happened yet.",
+  futurePredictedPeriod: 'Your period is predicted around this day.',
+  futureFertile: 'This day is in your estimated fertile window.',
+  futureOvulation: 'Ovulation is estimated on this day.',
+  futureNothing: 'Nothing is predicted for this day.',
+  close: 'Close',
 
   // Notifications — must never name the app or cycle terms (§7). Do not edit without §7 review.
   notifReminder: 'Reminder',

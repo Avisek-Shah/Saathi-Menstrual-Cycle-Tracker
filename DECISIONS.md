@@ -67,3 +67,7 @@ Format:
 **Decision:** `src/core/*` do all date arithmetic through `src/core/dates.ts`, which wraps `date-fns` and works entirely in `YYYY-MM-DD` local-time strings. Functions never read the current time — `today` is passed in.
 **Reason:** §2 lists date-fns; §3 requires local-time, date-only arithmetic and forbids storing anything but Gregorian date strings. CLAUDE.md rule 7 forbids `new Date()` inside core functions.
 **Reversible?** yes
+
+## 2026-08-31 — M5 Calendar / §6.3, §9, §11.2 / Spec sections / BS grid re-grids to Nepal month lengths (29–32) via dateConfigMap positional indexing (library keys "Asar" differ from §9 "Ashadh"). / Reason: `yearConfig["Ashadh"]` undefined; `Object.values` ordered Baisakh→Chaitra fixes. / Reversible? yes — swap back to name-key when library aligns.
+## 2026-08-31 — M5 Calendar renderBsPattern / §9 transliteration / Single-pass regex `replace` instead of chained `.replace()`. / Reason: month names "Ashadh"/"Mangsir" contain `d`; chained `d→date` would corrupt them. / Reversible? yes.
+## 2026-08-31 — M5 Calendar MonthGrid BS label / §9 display layer / `label` prop on `DayCell` passes `NepaliDate.fromAD(...).getBS().date`; grid never relabels Gregorian month. / Reason: avoids relabelling trap. / Reversible? yes.
