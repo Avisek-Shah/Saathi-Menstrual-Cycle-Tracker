@@ -55,13 +55,72 @@ export const en = {
   onboardingSkip: 'Skip',
   onboardingFinish: 'Finish',
 
+  // Home (§6.2). {a}/{b}/{days} filled via `fill`.
+  predictedOn: 'around {date}',
+  predictedRange: 'around {a} – {b}',
+  fertileInDays: 'in {days} days',
+  fertileToday: 'today',
+  fertileStartedDaysAgo: 'started {days} days ago',
+  fertileIrregularNote: 'less reliable when cycles vary',
+  todaysLog: "Today's log",
+  logSummaryEmpty: 'Nothing logged today',
+  edit: 'Edit',
+  // §5.6 — exact copy, do not change without §5.6 review.
+  irregularNoticeBody:
+    "Your recent cycles have varied quite a bit. That's common, and it just means predictions here are rough estimates.",
+  dismiss: 'Dismiss',
+  // §5.7 day-45 card.
+  recalcTitle: 'My cycle has changed — recalculate',
+  recalcBody: 'Re-anchor the prediction on your most recent period.',
+  recalcAction: 'Recalculate',
+
   // Log modal (§6.4).
   logFlow: 'Flow',
   logMood: 'Mood',
   logSymptoms: 'Symptoms',
   logNote: 'Note',
+  logAddNote: 'Add a note',
+  logNotePlaceholder: 'Anything you want to remember about today',
+  logNoteCount: '{n} / 500',
+  logFutureBlocked: "This day hasn't happened yet.",
   save: 'Save',
   cancel: 'Cancel',
+  saveFailedTitle: "Couldn't save",
+  saveFailedBody: 'Your entry is still here. Try again?',
+  retry: 'Retry',
+
+  // FlowLevel labels (§4.2). Never render the raw enum value.
+  flow_none: 'None',
+  flow_spotting: 'Spotting',
+  flow_light: 'Light',
+  flow_medium: 'Medium',
+  flow_heavy: 'Heavy',
+
+  // Mood labels (§4.2).
+  mood_happy: 'Happy',
+  mood_calm: 'Calm',
+  mood_energetic: 'Energetic',
+  mood_sad: 'Sad',
+  mood_anxious: 'Anxious',
+  mood_irritable: 'Irritable',
+  mood_sensitive: 'Sensitive',
+  mood_low_energy: 'Low energy',
+
+  // Symptom labels (§4.2).
+  symptom_cramps: 'Cramps',
+  symptom_headache: 'Headache',
+  symptom_backache: 'Backache',
+  symptom_bloating: 'Bloating',
+  symptom_breast_tenderness: 'Breast tenderness',
+  symptom_acne: 'Acne',
+  symptom_nausea: 'Nausea',
+  symptom_fatigue: 'Fatigue',
+  symptom_cravings: 'Cravings',
+  symptom_constipation: 'Constipation',
+  symptom_diarrhea: 'Diarrhea',
+  symptom_insomnia: 'Insomnia',
+  symptom_dizziness: 'Dizziness',
+  symptom_spotting_between: 'Spotting between periods',
 
   // Notifications — must never name the app or cycle terms (§7). Do not edit without §7 review.
   notifReminder: 'Reminder',

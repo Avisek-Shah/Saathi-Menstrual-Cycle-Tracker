@@ -17,6 +17,9 @@ export interface Settings {
   notif_daily_log: boolean;
   notif_daily_log_time: string; // 'HH:mm'
   schema_version: number;
+  // SPEC: 2026-08-31 — not in §4.3. Tracks the §5.6 irregular-cycles notice so it shows
+  // once per detection; reset to false when cycles stop being irregular. See DECISIONS.md.
+  irregular_notice_seen: boolean;
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
@@ -33,6 +36,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   notif_daily_log: false,
   notif_daily_log_time: '20:00',
   schema_version: 1,
+  irregular_notice_seen: false,
 };
 
 type SettingKey = keyof Settings;
@@ -44,6 +48,7 @@ const BOOLEAN_KEYS = new Set<SettingKey>([
   'notif_period_today',
   'notif_fertile_start',
   'notif_daily_log',
+  'irregular_notice_seen',
 ]);
 
 const NUMBER_KEYS = new Set<SettingKey>([
