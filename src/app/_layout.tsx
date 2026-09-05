@@ -2,17 +2,11 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
-import { Image, StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, {
-  Easing,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useEventListener } from 'expo';
+import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { colors } from '../theme/colors';
 import { useSettingsStore } from '../stores/useSettingsStore';
@@ -21,45 +15,56 @@ import { useSettingsStore } from '../stores/useSettingsStore';
 // over — otherwise there's a blank white frame between native splash and first JS paint.
 void SplashScreen.preventAutoHideAsync();
 
-// SPEC: overlay reuses assets/splash-icon.png at the same size/position the native
-// expo-splash-screen plugin config in app.json renders it at, and the same `colors.bg`
-// background, so the native→JS handoff has no visible pop/jump. No lottie-react-native —
-// react-native-reanimated is already a project dependency (§2), so the bloom/fade below
-// adds no new package.
-function AnimatedSplashOverlay({ onFinished }: { onFinished: () => void }) {
-  const opacity = useSharedValue(1);
-  const scale = useSharedValue(0.92);
+// SPEC: the splash clip runs ~3s. If `playToEnd` never arrives (asset failed to decode,
+// player stalled) the overlay would sit on screen forever, so the wait is hard-capped.
+const SPLASH_MAX_MS = 4500;
+// Same idea for the native splash: if the player never reports a status, stop waiting.
+const PLAYER_READY_MAX_MS = 1500;
+
+// SPEC: overlay plays assets/splash_animation.mp4 once over the same background the
+// native expo-splash-screen plugin config in app.json uses, so the native→JS handoff has
+// no visible pop. Two timing rules keep it a single continuous splash rather than a
+// sequence of separate screens:
+//   - the native splash is held until the player can actually paint, otherwise the mark
+//     disappears and a bare background frame shows before the clip's first frame;
+//   - it cuts (not cross-fades) to the app on the last frame, because a fade blends the
+//     clip's final frame with the home screen underneath and reads as two screens stacked.
+function AnimatedSplashOverlay({
+  onReady,
+  onFinished,
+}: {
+  onReady: () => void;
+  onFinished: () => void;
+}) {
+  const player = useVideoPlayer(require('../../assets/splash_animation.mp4'), (p) => {
+    p.loop = false;
+    p.play();
+  });
+
+  useEventListener(player, 'statusChange', ({ status }) => {
+    if (status === 'readyToPlay' || status === 'error') onReady();
+  });
+
+  useEventListener(player, 'playToEnd', onFinished);
 
   useEffect(() => {
-    // Blooming pulse (scale up past 1, settle back) then fade the whole overlay out.
-    scale.value = withSequence(
-      withTiming(1.06, { duration: 320, easing: Easing.out(Easing.quad) }),
-      withTiming(1, { duration: 220, easing: Easing.inOut(Easing.quad) }),
-    );
-    opacity.value = withSequence(
-      withTiming(1, { duration: 420 }),
-      withTiming(0, { duration: 360 }, (finished) => {
-        if (finished) runOnJS(onFinished)();
-      }),
-    );
-  }, [onFinished, opacity, scale]);
-
-  const style = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: scale.value }],
-  }));
+    const readyTimer = setTimeout(onReady, PLAYER_READY_MAX_MS);
+    const finishTimer = setTimeout(onFinished, SPLASH_MAX_MS);
+    return () => {
+      clearTimeout(readyTimer);
+      clearTimeout(finishTimer);
+    };
+  }, [onReady, onFinished]);
 
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[StyleSheet.absoluteFill, styles.overlay, style]}
-    >
-      <Image
-        source={require('../../assets/splash-icon.png')}
-        style={styles.logo}
-        resizeMode="contain"
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.overlay]}>
+      <VideoView
+        player={player}
+        style={styles.video}
+        contentFit="contain"
+        nativeControls={false}
       />
-    </Animated.View>
+    </View>
   );
 }
 
@@ -70,7 +75,7 @@ export default function RootLayout() {
   const hydrated = useSettingsStore((s) => s.hydrated);
   const onboardingComplete = useSettingsStore((s) => s.settings.onboarding_complete);
 
-  // True once the intro animation has faded out and the overlay has unmounted.
+  // True once the splash clip has finished and the overlay has unmounted.
   const [introDone, setIntroDone] = useState(false);
 
   useEffect(() => {
@@ -89,9 +94,8 @@ export default function RootLayout() {
     }
   }, [hydrated, onboardingComplete, segments, router]);
 
-  // Fires once the overlay mounts on top of the (already-hydrated) app. The native splash
-  // hides right here, revealing the overlay instead of a blank frame, then the overlay
-  // itself takes over the fade.
+  // Fires once the splash player can paint. Hiding the native splash here (rather than on
+  // overlay mount) means the video's first frame is what replaces the native mark.
   const onOverlayReady = useCallback(() => {
     void SplashScreen.hideAsync();
   }, []);
@@ -115,39 +119,23 @@ export default function RootLayout() {
           </Stack>
         ) : null}
         {hydrated && !introDone ? (
-          <AnimatedSplashOverlayMount onReady={onOverlayReady} onFinished={onIntroFinished} />
+          <AnimatedSplashOverlay onReady={onOverlayReady} onFinished={onIntroFinished} />
         ) : null}
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
 
-// Separate from AnimatedSplashOverlay so `onReady` (hide native splash) fires from a plain
-// mount effect, kept apart from the animation's own useEffect above.
-function AnimatedSplashOverlayMount({
-  onReady,
-  onFinished,
-}: {
-  onReady: () => void;
-  onFinished: () => void;
-}) {
-  useEffect(() => {
-    onReady();
-    // Intentionally once on mount only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return <AnimatedSplashOverlay onFinished={onFinished} />;
-}
-
 const styles = StyleSheet.create({
   overlay: {
-    backgroundColor: colors.bg,
+    // SPEC: matches assets/splash_animation.mp4's own background, not colors.bg —
+    // keeps the video edge-to-edge with no color seam during playback.
+    backgroundColor: '#FBE4CE',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logo: {
-    width: 160,
-    height: 160,
+  video: {
+    width: '70%',
+    height: '70%',
   },
 });

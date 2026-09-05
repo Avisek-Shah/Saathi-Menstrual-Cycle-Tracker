@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 
 import {
   cycleDay,
+  cycleRingDays,
   currentPeriod,
   dayCellState,
   lastPeriodStartOnOrBefore,
@@ -116,5 +117,56 @@ describe('dayCellState (§11.2 precedence)', () => {
     expect(
       dayCellState({ dateIso: '2025-06-20', loggedFlow: null, hasLogRow: false, periods, prediction }),
     ).toBe('none');
+  });
+});
+
+describe('cycleRingDays', () => {
+  const prediction = {
+    ovulationDate: '2025-06-15',
+    fertileStart: '2025-06-10',
+    fertileEnd: '2025-06-16',
+    nextPeriodStart: '2025-06-29',
+    nextPeriodEnd: '2025-07-02',
+  };
+  const periods = [period('2025-06-01', '2025-06-05')];
+
+  it('numbers days 1..cycleLength from anchor and flags today', () => {
+    const days = cycleRingDays({
+      anchor: '2025-06-01',
+      cycleLength: 28,
+      today: '2025-06-03',
+      periods,
+      prediction,
+    });
+    expect(days).toHaveLength(28);
+    expect(days[0]).toEqual({ dateIso: '2025-06-01', dayNumber: 1, state: 'loggedPeriod', isToday: false });
+    expect(days[2]).toEqual({ dateIso: '2025-06-03', dayNumber: 3, state: 'loggedPeriod', isToday: true });
+    expect(days.filter((d) => d.isToday)).toHaveLength(1);
+  });
+
+  it('marks a day inside the logged period as loggedPeriod without needing a flow log', () => {
+    const days = cycleRingDays({
+      anchor: '2025-06-01',
+      cycleLength: 28,
+      today: '2025-06-01',
+      periods,
+      prediction,
+    });
+    expect(days[3].state).toBe('loggedPeriod'); // 2025-06-04, inside the period, no log passed
+  });
+
+  it('otherwise follows ovulation > fertile > predicted precedence', () => {
+    const days = cycleRingDays({
+      anchor: '2025-06-01',
+      cycleLength: 32,
+      today: '2025-06-01',
+      periods,
+      prediction,
+    });
+    const byIso = Object.fromEntries(days.map((d) => [d.dateIso, d.state]));
+    expect(byIso['2025-06-15']).toBe('ovulation');
+    expect(byIso['2025-06-11']).toBe('fertile');
+    expect(byIso['2025-06-30']).toBe('predictedPeriod');
+    expect(byIso['2025-06-20']).toBe('none');
   });
 });

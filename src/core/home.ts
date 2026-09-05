@@ -97,3 +97,55 @@ export function dayCellState(args: {
   if (hasLogRow) return 'loggedNoFlow';
   return 'none';
 }
+
+export interface RingDay {
+  dateIso: string;
+  /** 1-based day within the ring's cycle, not the calendar day-of-month. */
+  dayNumber: number;
+  state: Exclude<DayCellState, 'loggedNoFlow'>;
+  isToday: boolean;
+}
+
+// SPEC: 2026-09-05 — the Home cycle ring has no per-day flow log to consult (only the
+// current week's logs are loaded on Home), so it cannot distinguish `loggedNoFlow` the way
+// the calendar does. A day inside a `Period` range is shown as `loggedPeriod` on the strength
+// of the period record alone; every other precedence rule matches `dayCellState`. See
+// DECISIONS.md.
+function ringDayState(
+  dateIso: string,
+  periods: Pick<Period, 'start_date' | 'end_date'>[],
+  prediction: Pick<
+    Prediction,
+    'ovulationDate' | 'fertileStart' | 'fertileEnd' | 'nextPeriodStart' | 'nextPeriodEnd'
+  >,
+): Exclude<DayCellState, 'loggedNoFlow'> {
+  const inRange = (a: string, b: string) => dateIso >= a && dateIso <= b;
+  if (currentPeriod(periods, dateIso)) return 'loggedPeriod';
+  if (dateIso === prediction.ovulationDate) return 'ovulation';
+  if (inRange(prediction.fertileStart, prediction.fertileEnd)) return 'fertile';
+  if (inRange(prediction.nextPeriodStart, prediction.nextPeriodEnd)) return 'predictedPeriod';
+  return 'none';
+}
+
+/** §16 Home cycle ring — one full cycle of days, starting at `anchor`, for the hero chart. */
+export function cycleRingDays(args: {
+  anchor: string;
+  cycleLength: number;
+  today: string;
+  periods: Pick<Period, 'start_date' | 'end_date'>[];
+  prediction: Pick<
+    Prediction,
+    'ovulationDate' | 'fertileStart' | 'fertileEnd' | 'nextPeriodStart' | 'nextPeriodEnd'
+  >;
+}): RingDay[] {
+  const { anchor, cycleLength, today, periods, prediction } = args;
+  return Array.from({ length: cycleLength }, (_, i) => {
+    const dateIso = addDays(anchor, i);
+    return {
+      dateIso,
+      dayNumber: i + 1,
+      state: ringDayState(dateIso, periods, prediction),
+      isToday: dateIso === today,
+    };
+  });
+}

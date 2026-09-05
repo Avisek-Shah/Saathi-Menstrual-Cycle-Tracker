@@ -5,7 +5,7 @@
     "scheme": "saathi",
     "version": "1.1.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/app-icon-period-tracker.png",
     "userInterfaceStyle": "light",
     "platforms": [
       "android",
@@ -17,12 +17,13 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FFF9FB",
+          "backgroundColor": "#f8e4cd",
           "image": "./assets/splash-icon.png",
           "imageWidth": 160,
           "resizeMode": "contain"
         }
-      ]
+      ],
+      "expo-video"
     ],
     "ios": {
       "supportsTablet": true,
@@ -35,10 +36,8 @@
         "POST_NOTIFICATIONS"
       ],
       "adaptiveIcon": {
-        "backgroundColor": "#E8637C",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/app-icon-period-tracker.png"
       },
       "predictiveBackGestureEnabled": false
     },
