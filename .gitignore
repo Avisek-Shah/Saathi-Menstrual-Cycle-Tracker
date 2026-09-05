@@ -42,4 +42,6 @@ yarn-error.*
 
 #ai
 .mcp.json
+.agents
+
 
