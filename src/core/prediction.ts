@@ -45,7 +45,11 @@ const WEIGHTS = [6, 5, 4, 3, 2, 1] as const;
 const PERIOD_MIN = 1;
 const PERIOD_MAX = 10;
 const LUTEAL_PHASE_DAYS = 14; // §3 fixed luteal-phase assumption
-const RECALC_ANCHOR_DAYS = 45; // §5.7
+// §5.7 / UI/UX spec §2.7 D–E (A1, 2026-09-06). Past `nextPeriodStart`: 1..window is
+// "expected around now", window+1..7 is "no period logged yet", 8+ freezes predictions.
+// 60+ days since the last period start re-anchors instead of counting phantom cycle days.
+const PAUSE_DAYS_PAST = 8;
+const LONG_GAP_DAYS = 60;
 
 function clampRound(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.round(value)));
@@ -192,13 +196,17 @@ export function predict(
   };
 }
 
-/** §5.7 late-period state. Drives Home copy; kept pure and here so §14 can test the boundaries. */
+/**
+ * §5.7 / UI/UX spec §2.7 D–E late-period state. Drives Home copy and the ring behaviour;
+ * kept pure and here so §14 can test the boundaries.
+ */
 export type LateState =
   | { status: 'upcoming'; daysUntil: number }
   | { status: 'periodStarted' }
   | { status: 'expectedNow'; daysPast: number }
-  | { status: 'late'; daysPast: number }
-  | { status: 'offerRecalculate'; daysPast: number; daysSinceLastPeriodStart: number };
+  | { status: 'noPeriodYet'; daysPast: number; showStartPrompt: boolean }
+  | { status: 'paused'; daysPast: number }
+  | { status: 'longGap'; daysPast: number; daysSinceLastPeriodStart: number };
 
 export function lateState(args: {
   nextPeriodStart: string;
@@ -218,10 +226,15 @@ export function lateState(args: {
   const daysPast = -daysUntil;
   const daysSinceLastPeriodStart = daysBetween(lastPeriodStart, today);
 
-  if (daysSinceLastPeriodStart >= RECALC_ANCHOR_DAYS) {
-    return { status: 'offerRecalculate', daysPast, daysSinceLastPeriodStart };
+  // §2.7 E — a long silence re-anchors rather than accumulating phantom cycle days.
+  if (daysSinceLastPeriodStart >= LONG_GAP_DAYS) {
+    return { status: 'longGap', daysPast, daysSinceLastPeriodStart };
   }
   if (daysPast === 0) return { status: 'upcoming', daysUntil: 0 };
   if (daysPast <= predictionWindow) return { status: 'expectedNow', daysPast };
-  return { status: 'late', daysPast };
+  if (daysPast < PAUSE_DAYS_PAST) {
+    // §2.7 D — the "Did your period start?" prompt appears from the 2nd day of this tier.
+    return { status: 'noPeriodYet', daysPast, showStartPrompt: daysPast >= predictionWindow + 2 };
+  }
+  return { status: 'paused', daysPast };
 }

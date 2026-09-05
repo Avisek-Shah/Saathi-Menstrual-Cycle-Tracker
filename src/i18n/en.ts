@@ -19,6 +19,24 @@ export const en = {
   cycleDay: 'Cycle day {day}',
   confidenceEstimate: 'estimate — keep logging',
 
+  // Cycle ring centre — phase-aware hero (§2.5 table) + chip. {n}/{total}/{days}/{a}/{b}/{date}
+  // filled via `fill`. Late-period wording is §5.7 / §2.7 D–E sensitive — do not edit without
+  // that review.
+  ringHeroFertile: 'Fertile window · day {n} of {total}',
+  ringHeroOvulation: 'Ovulation likely today',
+  ringHeroApprox: 'Period in ~{days} days',
+  ringHeroApproxOne: 'Period in ~1 day',
+  ringHeroExpectedRange: 'Period expected {a} – {b}',
+  ringHeroNoPeriodYet: 'No period logged yet',
+  ringHeroPaused: 'Predictions paused',
+  ringHeroLongGap: "It's been a while",
+  ringHeroNoData: 'Log your period to start',
+  ringDateAround: 'around {date}',
+  ringChipFromYou: 'estimate — from what you told us',
+  ringToggleHint: 'Shows the predicted date',
+  ringA11yKnown: 'Cycle day {day} of about {length}. {hero}. This is an estimate.',
+  ringA11yNoData: 'No period logged yet. Add your last period to see predictions.',
+
   today: 'Today',
   history: 'History',
 
@@ -146,10 +164,13 @@ export const en = {
   irregularNoticeBody:
     "Your recent cycles have varied quite a bit. That's common, and it just means predictions here are rough estimates.",
   dismiss: 'Dismiss',
-  // §5.7 day-45 card.
-  recalcTitle: 'My cycle has changed — recalculate',
-  recalcBody: 'Re-anchor the prediction on your most recent period.',
-  recalcAction: 'Recalculate',
+  // §2.7 D inline prompt — appears from the 2nd day a period is unlogged past the window.
+  startPromptQuestion: 'Did your period start?',
+  startPromptYes: 'Yes, log it',
+  startPromptNo: 'Not yet',
+  // §2.7 E — one re-anchor card after a long silence. Do not edit without §5.7 review.
+  longGapBody: "It's been a while. When did your last period start?",
+  longGapAction: 'Update last period',
 
   // Log modal (§6.4).
   logHeaderQuestion: 'How was today?',

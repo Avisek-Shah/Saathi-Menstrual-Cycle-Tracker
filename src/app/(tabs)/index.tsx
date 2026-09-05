@@ -2,13 +2,14 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState, View } from 'react-native';
 
-import { currentMonthFor, formatDate, formatDateRange, getMonthGrid } from '../../core/calendar';
+import { formatDate, formatDateRange } from '../../core/calendar';
 import type { Symptom } from '../../core/enums';
 import {
   cycleDay,
+  cycleRingModel,
   currentPeriod,
+  heroPhase,
   lastPeriodStartOnOrBefore,
-  monthRingDays,
   predictionDateRange,
   primaryAction,
 } from '../../core/home';
@@ -22,15 +23,16 @@ import {
 import { IrregularNoticeCard } from '../../components/cycle/IrregularNoticeCard';
 import { CycleRingCard } from '../../components/cycle/CycleRingCard';
 import { FertileCard } from '../../components/cycle/FertileCard';
+import { LongGapCard } from '../../components/cycle/LongGapCard';
 import { LogSummary } from '../../components/cycle/LogSummary';
 import { MiniStatCard } from '../../components/cycle/MiniStatCard';
 import { QuickLog } from '../../components/cycle/QuickLog';
-import { RecalcCard } from '../../components/cycle/RecalcCard';
+import { StartPrompt } from '../../components/cycle/StartPrompt';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 import * as dailyLogs from '../../db/repositories/dailyLogs';
 import { spacing } from '../../theme/spacing';
-import { en, fill } from '../../i18n/en';
+import { en } from '../../i18n/en';
 import { todayIso } from '../../services/clock';
 import { useCycleStore } from '../../stores/useCycleStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
@@ -52,7 +54,7 @@ export default function Home() {
   const saveLog = useCycleStore((s) => s.saveLog);
 
   const [today, setToday] = useState(() => todayIso());
-  const [recalcDismissed, setRecalcDismissed] = useState(false);
+  const [startPromptDismissed, setStartPromptDismissed] = useState(false);
   const [recentSymptoms, setRecentSymptoms] = useState<Symptom[]>([]);
 
   useFocusEffect(
@@ -86,56 +88,43 @@ export default function Home() {
     }, [today]),
   );
 
-  // Hooks must run unconditionally above the `!ready` early return below, so the null-guard
-  // lives inside the memo rather than being handled by that return.
-  const ringDays = useMemo(() => {
-    if (!prediction) return [];
-    const system = settings.calendar_system ?? 'AD';
-    const { year, month } = currentMonthFor(system, today);
-    const grid = getMonthGrid(year, month, system, today);
-    return monthRingDays({ cells: grid.cells, today, periods, prediction });
-  }, [prediction, periods, today, settings.calendar_system]);
+  // Ring model + hero phase + late state, in one memo so the hooks stay unconditional above
+  // the `!ready` early return. `lateState` needs the anchor, so it is resolved here too.
+  const ring = useMemo(() => {
+    if (!prediction) return null;
+    const anchor = lastPeriodStartOnOrBefore(periods, today);
+    const late = lateState({
+      nextPeriodStart: prediction.nextPeriodStart,
+      predictionWindow: prediction.predictionWindow,
+      lastPeriodStart: anchor,
+      today,
+      flowLoggedSinceNextStart: periods.some((p) => p.start_date >= prediction.nextPeriodStart),
+    });
+    return {
+      anchor,
+      late,
+      model: cycleRingModel({ periods, prediction, today, late }),
+      phase: heroPhase({ periods, prediction, today, late }),
+    };
+  }, [prediction, periods, today]);
 
-  if (!ready || !prediction) {
+  if (!ready || !prediction || !ring) {
     return <Screen />;
   }
 
-  const anchor = lastPeriodStartOnOrBefore(periods, today);
+  const { anchor, late, model, phase } = ring;
   const onPeriod = currentPeriod(periods, today);
-  const late = lateState({
-    nextPeriodStart: prediction.nextPeriodStart,
-    predictionWindow: prediction.predictionWindow,
-    lastPeriodStart: anchor,
-    today,
-    flowLoggedSinceNextStart: periods.some((p) => p.start_date >= prediction.nextPeriodStart),
-  });
 
-  const headline = (() => {
-    if (onPeriod) {
-      return fill(en.onPeriod, { day: cycleDay(onPeriod.start_date, today) });
-    }
-    if (late.status === 'expectedNow' || late.status === 'offerRecalculate')
-      return en.expectedAroundNow;
-    if (late.status === 'late') return fill(en.lateBy, { days: late.daysPast });
-    const daysUntil = late.status === 'upcoming' ? late.daysUntil : 0;
-    return daysUntil === 1 ? en.periodInOne : fill(en.periodIn, { days: daysUntil });
-  })();
-
-  // §5.5's window tops out at ±7 days, so this is always "this year" — dropping the year is
-  // the highest-value cut of all, since this line renders squeezed inside the ring itself.
   const range = predictionDateRange(prediction.nextPeriodStart, prediction.predictionWindow);
-  const dateLine = range.single
-    ? fill(en.predictedOn, { date: formatDate(range.single, settings.calendar_system, 'd MMM') })
-    : fill(en.predictedRange, {
-        a: formatDate(range.start, settings.calendar_system, 'd MMM'),
-        b: formatDate(range.end, settings.calendar_system, 'd MMM'),
-      });
 
   const action = primaryAction({
     onPeriod: onPeriod !== null,
     hasFlowToday: todayLog !== null && todayLog.flow !== 'none',
     periodExpected:
-      late.status === 'expectedNow' || late.status === 'late' || late.status === 'offerRecalculate',
+      late.status === 'expectedNow' ||
+      late.status === 'noPeriodYet' ||
+      late.status === 'paused' ||
+      late.status === 'longGap',
   });
 
   const onPrimary = () => {
@@ -147,12 +136,12 @@ export default function Home() {
   };
 
   const showIrregularNotice = prediction.isIrregular && !settings.irregular_notice_seen;
-  const showRecalc = late.status === 'offerRecalculate' && !recalcDismissed;
+  const showStartPrompt =
+    phase.phase === 'noPeriodYet' && phase.showStartPrompt && !startPromptDismissed;
 
   // Mini-cards only ever show a date within the current cycle (≤45 days out per §5.5's
-  // widest window), so the year is always implicit — dropping it here (but not from the
-  // shared `formatDateRange`, which other screens use for genuinely cross-year spans) cuts
-  // the label to its scannable minimum: "24 Sep" instead of "24 Sep 2026".
+  // widest window), so the year is always implicit — dropping it here cuts the label to its
+  // scannable minimum: "24 Sep" instead of "24 Sep 2026".
   const nextPeriodValue = range.single
     ? formatDate(range.single, settings.calendar_system, 'd MMM')
     : formatDateRange(range.start, range.end, settings.calendar_system);
@@ -182,21 +171,24 @@ export default function Home() {
           onDismiss={() => void updateSettings({ irregular_notice_seen: true })}
         />
       ) : null}
-      {showRecalc ? (
-        <RecalcCard
-          onRecalculate={() => {
-            setRecalcDismissed(true);
-            void refresh(today);
+      {showStartPrompt ? (
+        <StartPrompt
+          onConfirm={() => {
+            setStartPromptDismissed(true);
+            void saveLog(today, 'medium', [], [], null, today);
           }}
-          onDismiss={() => setRecalcDismissed(true)}
+          onDismiss={() => setStartPromptDismissed(true)}
         />
+      ) : null}
+      {phase.phase === 'longGap' ? (
+        <LongGapCard onReanchor={() => router.push('/settings/profile')} />
       ) : null}
 
       <CycleRingCard
-        days={ringDays}
-        headline={headline}
-        dateLine={dateLine}
-        confidenceLabel={prediction.confidence === 'low' ? en.confidenceEstimate : null}
+        model={model}
+        phase={phase}
+        prediction={prediction}
+        calendarSystem={settings.calendar_system}
       />
 
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>

@@ -1,268 +1,281 @@
 import { type ReactNode, useEffect } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, {
+  Easing,
   ReduceMotion,
-  useAnimatedStyle,
+  useAnimatedProps,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Line, Path } from 'react-native-svg';
 
-import type { DayCellState, RingDay } from '../../core/home';
-import { colors } from '../../theme/colors';
-import { typography } from '../../theme/typography';
+import type { CycleRingModel } from '../../core/home';
+import { useColors } from '../../theme/useColors';
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface CycleRingProps {
-  days: RingDay[];
+  model: CycleRingModel;
+  /** Diameter in dp. §2.3 calls for 240; the card may pass a little more. */
   size?: number;
-  strokeWidth?: number;
-  /** Rendered centered over the ring — the headline/date/confidence text. */
+  /** The 3-line centre (eyebrow / hero / chip), rendered over the ring. */
   children?: ReactNode;
+  /** One full sentence for TalkBack — the ring is a single accessible element (§10). */
+  accessibilityLabel: string;
 }
 
-// §11.2 mandates `primaryMuted` for the predicted-period *calendar cell*, where M10
-// darkened it to near-black (#050505ff) for grid legibility. On the ring — soft pastel arcs
-// on a pale track — near-black reads as an error next to the mint/pink arcs, and before the
-// ring became a full calendar month this arc was off-screen so nobody saw it. The ring keeps
-// the softer pre-M10 pink for this one state; every other fill is the shared token, and the
-// calendar is untouched. See DECISIONS.md 2026-09-06.
-const RING_PREDICTED_FILL = '#F9D4DC';
-
-// §11.2 — colour is never the only carrier of meaning; every filled state elsewhere in the
-// app (DayCell) also gets a distinct ring or dot. The ring reuses the same fills so a user
-// who already reads the calendar/week strip recognises the same states here.
-function colorForState(state: Exclude<DayCellState, 'loggedNoFlow' | 'none'>): string {
-  switch (state) {
-    case 'loggedPeriod':
-      return colors.primary;
-    case 'predictedPeriod':
-      return RING_PREDICTED_FILL;
-    case 'fertile':
-      return colors.fertile;
-    case 'ovulation':
-      return colors.ovulation;
-  }
-}
-
-// Mirrors DayCell's text-color rule: white text on the solid fills, dark text on the pale
-// washes and the empty track — never relies on colour alone since the number itself is the
-// second signal (§11.2). Predicted period is a pale wash on the ring (see RING_PREDICTED_FILL),
-// so its number is dark here, not the white DayCell uses on the darkened calendar fill.
-function textColorForState(state: DayCellState): string {
-  if (state === 'loggedPeriod' || state === 'ovulation') return colors.surface;
-  if (state === 'none') return colors.textMuted;
-  return colors.text;
-}
-
-interface Segment {
-  state: Exclude<DayCellState, 'loggedNoFlow' | 'none'>;
-  startIndex: number;
-  count: number;
-}
-
-/** Run-length encode consecutive same-state days so each colour is drawn as one arc, not N. */
-function toSegments(days: RingDay[]): Segment[] {
-  const segments: Segment[] = [];
-  for (let i = 0; i < days.length; i++) {
-    const state = days[i].state;
-    if (state === 'none') continue;
-    const last = segments[segments.length - 1];
-    if (last && last.startIndex + last.count === i && last.state === state) {
-      last.count += 1;
-    } else {
-      segments.push({ state, startIndex: i, count: 1 });
-    }
-  }
-  return segments;
-}
+const BAND_STROKE = 14; // §2.3
+const PROGRESS_STROKE = 4; // §2.3
 
 /**
- * §16 / BUILD_PLAN "SVG cycle-day ring" — one calendar month laid out as a ring (user
- * request 2026-09-06; was one cycle from the last-period anchor): a coloured arc per state
- * (period / predicted / fertile / ovulation), each day numbered by its day-of-month, plus a
- * marker on today. `days` is `monthRingDays()` output. Not interactive — the calendar tab
- * covers logging; this is the at-a-glance hero.
+ * Cycle-relative ring (UI/UX spec §2.2–2.7). Cycle day 1 at 12 o'clock, clockwise, length
+ * `model.length`. Four layers over a neutral track: the menstruation + fertile phase band, a
+ * one-day ovulation notch, a thin inner elapsed stroke, and the today-marker. Predicted arcs
+ * are soft and feathered; the logged menstruation arc is hard-edged (§2.4). No numerals.
  */
-export function CycleRing({ days, size = 288, strokeWidth = 24, children }: CycleRingProps) {
-  const radius = (size - strokeWidth) / 2;
+export function CycleRing({ model, size = 240, children, accessibilityLabel }: CycleRingProps) {
+  const c = useColors();
+  const {
+    length: L,
+    periodLength,
+    fertileStartDay,
+    fertileEndDay,
+    ovulationDay,
+    elapsedDays,
+    todayDay,
+    overflowDays,
+    frozen,
+    ghost,
+    lowConfidence,
+    featherDays,
+  } = model;
+
   const cx = size / 2;
   const cy = size / 2;
-  const circumference = 2 * Math.PI * radius;
-  const segments = toSegments(days);
+  const bandR = (size - BAND_STROKE) / 2;
+  const progressR = bandR - 12;
+  const bandC = 2 * Math.PI * bandR;
+  const progressC = 2 * Math.PI * progressR;
+  const overflowR = bandR + BAND_STROKE / 2 + 8;
+  const tickInner = bandR - BAND_STROKE / 2 - 2;
+  const tickOuter = bandR + BAND_STROKE / 2 + 2;
 
-  // Each day's centre point sits on the ring band itself, at the midpoint of its arc slice —
-  // same angle math the today-marker used before numbers existed.
-  const pointFor = (index: number) => {
-    const angle = ((index + 0.5) / days.length) * 2 * Math.PI - Math.PI / 2;
-    return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+  // Day offset (fractional) → point on a circle of radius r. Day 0 sits at 12 o'clock.
+  const deg = (day: number) => -90 + (day / L) * 360;
+  const xy = (r: number, day: number) => {
+    const rad = (deg(day) * Math.PI) / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
   };
-  // A point on the ring band at day-index position `k` (fractional allowed) — `k` whole is
-  // the seam *before* day `k`, where a segment's dasharray starts/ends; a fractional `k` is
-  // used to place the pulled-in end-cap discs a fraction of a day inside that seam.
-  const seamPoint = (k: number) => {
-    const angle = (k / days.length) * 2 * Math.PI - Math.PI / 2;
-    return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+  // A band arc from `d0` to `d1` as a dashed segment of a full circle — animation-friendly,
+  // and the technique never touches the path `d` string on the JS thread.
+  const arc = (d0: number, d1: number) => {
+    const len = (Math.max(0, d1 - d0) / L) * bandC;
+    return {
+      strokeDasharray: `${len} ${bandC - len}`,
+      strokeDashoffset: -((d0 / L) * bandC),
+    };
   };
-  const todayIndex = days.findIndex((d) => d.isToday);
-  const todayPoint = todayIndex >= 0 ? pointFor(todayIndex) : null;
-  const numberBox = Math.max(16, Math.min(strokeWidth, 22));
-  // The marker ring inverts against its own fill — dark on the pale washes and the empty
-  // track, white on the two solid fills — which is the same contrast rule the digit itself
-  // follows. Doing it this way means one ring is enough: no second halo ring widening the
-  // marker into the neighbouring day's number.
-  const todayRingColor =
-    todayIndex >= 0 && textColorForState(days[todayIndex].state) === colors.surface
-      ? colors.surface
-      : colors.text;
+  // A partial arc as a real path — used only for the non-animated dashed overflow arc.
+  const arcPath = (r: number, d0: number, d1: number) => {
+    const p0 = xy(r, d0);
+    const p1 = xy(r, d1);
+    const large = d1 - d0 > L / 2 ? 1 : 0;
+    return `M ${p0.x} ${p0.y} A ${r} ${r} 0 ${large} 1 ${p1.x} ${p1.y}`;
+  };
 
-  // §11.7 — a single opacity fade on mount, ≤200ms, honours the OS reduce-motion setting
-  // (resolves instantly when it's on). No loop, no colour/size animation.
-  const opacity = useSharedValue(0);
+  // §11.7 / §12 — one sweep on mount, 600ms ease-out, resolves instantly under reduce-motion.
+  const sweep = useSharedValue(frozen ? 1 : 0);
   useEffect(() => {
-    opacity.value = withTiming(1, { duration: 200, reduceMotion: ReduceMotion.System });
-  }, [opacity]);
-  const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
+    if (frozen) {
+      sweep.value = 1;
+      return;
+    }
+    sweep.value = withTiming(1, {
+      duration: 600,
+      easing: Easing.out(Easing.ease),
+      reduceMotion: ReduceMotion.System,
+    });
+  }, [frozen, sweep]);
+  const elapsedProps = useAnimatedProps(() => {
+    const full = (elapsedDays / L) * progressC;
+    return { strokeDasharray: [sweep.value * full, progressC] as unknown as string };
+  });
+
+  const fertileOpacity = lowConfidence ? 0.5 : 1;
+  const hasFertile = fertileEndDay > fertileStartDay;
+  const feather = Math.min(featherDays, (fertileEndDay - fertileStartDay) / 2);
 
   return (
-    <Animated.View style={[{ width: size, height: size }, style]}>
+    <View
+      style={{ width: size, height: size }}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={accessibilityLabel}
+    >
       <View
-        style={{ position: 'absolute', width: size, height: size }}
+        style={{ position: 'absolute', width: size, height: size, opacity: frozen ? 0.45 : 1 }}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
         <Svg width={size} height={size}>
+          {/* Neutral track / ghost ring */}
           <Circle
             cx={cx}
             cy={cy}
-            r={radius}
-            stroke={colors.border}
-            strokeWidth={strokeWidth}
+            r={bandR}
+            stroke={c.neutralTrack}
+            strokeWidth={BAND_STROKE}
             fill="none"
+            opacity={ghost ? 0.15 : 1}
           />
-          {segments.flatMap((seg) => {
-            // The ring is one calendar month, not a wrapping cycle: the last day of the
-            // month is not adjacent to the first, so both ends are open (treated as `none`),
-            // which gives a rounded cap at the 12 o'clock seam on each side.
-            const endIndex = seg.startIndex + seg.count;
-            const before: DayCellState =
-              seg.startIndex === 0 ? 'none' : days[seg.startIndex - 1].state;
-            const after: DayCellState = endIndex === days.length ? 'none' : days[endIndex].state;
-            const color = colorForState(seg.state);
 
-            // A rounded arc end is a dome of radius strokeWidth/2. Drawn the obvious way —
-            // strokeLinecap="round", or a filled disc centred *on* the seam — that dome
-            // overshoots the seam by strokeWidth/2 and lands on top of the day number just
-            // outside the arc: at a 30-day cycle a `none` day's centre is only ~14px past
-            // the seam, less than the dome's 12px reach, so 30 / 8 / 11 / 19 (the numbers
-            // bordering the predicted-period and fertile arcs) got a coloured blob dumped on
-            // them. Fix: pull the butt-capped stroke *in* by strokeWidth/2 at every end that
-            // borders the empty track, then put the dome back with a disc whose outer edge
-            // stops exactly at the true seam — same rounded silhouette, nothing crossing
-            // into the neighbouring number. Ends that meet another colour keep their flush
-            // butt join, so the tight fertile → ovulation → fertile joins stay flat.
-            const capArc = strokeWidth / 2;
-            const arcPerDay = circumference / days.length;
-            const capDays = capArc / arcPerDay;
-            const startInset = before === 'none' ? capArc : 0;
-            const endInset = after === 'none' ? capArc : 0;
-            const rawArcLength = (circumference * seg.count) / days.length;
-            const arcLength = Math.max(0.1, rawArcLength - startInset - endInset);
-            const offset = (circumference * seg.startIndex) / days.length + startInset;
-
-            const main = (
+          {!ghost && (
+            <>
+              {/* Menstruation arc — logged, hard-edged, full saturation (§2.4) */}
               <Circle
-                key={`${seg.state}-${seg.startIndex}`}
                 cx={cx}
                 cy={cy}
-                r={radius}
-                stroke={color}
-                strokeWidth={strokeWidth}
-                strokeDasharray={`${arcLength} ${circumference - arcLength}`}
-                strokeDashoffset={-offset}
+                r={bandR}
+                stroke={c.periodLogged}
+                strokeWidth={BAND_STROKE}
                 strokeLinecap="butt"
                 fill="none"
                 rotation={-90}
                 origin={`${cx}, ${cy}`}
+                opacity={lowConfidence ? 0.6 : 1}
+                {...arc(0, periodLength)}
               />
-            );
 
-            const caps = [];
-            if (before === 'none') {
-              const p = seamPoint(seg.startIndex + capDays);
-              caps.push(
-                <Circle
-                  key={`${seg.state}-${seg.startIndex}-cap-start`}
-                  cx={p.x}
-                  cy={p.y}
-                  r={capArc}
-                  fill={color}
-                />,
-              );
-            }
-            if (after === 'none') {
-              const p = seamPoint(seg.startIndex + seg.count - capDays);
-              caps.push(
-                <Circle
-                  key={`${seg.state}-${seg.startIndex}-cap-end`}
-                  cx={p.x}
-                  cy={p.y}
-                  r={capArc}
-                  fill={color}
-                />,
-              );
-            }
-            return [main, ...caps];
-          })}
+              {/* Fertile arc — predicted: soft, three stacked passes that fade toward the ends */}
+              {hasFertile && (
+                <>
+                  <Circle
+                    cx={cx}
+                    cy={cy}
+                    r={bandR}
+                    stroke={c.fertile}
+                    strokeWidth={BAND_STROKE}
+                    strokeLinecap="round"
+                    fill="none"
+                    rotation={-90}
+                    origin={`${cx}, ${cy}`}
+                    opacity={0.3 * fertileOpacity}
+                    {...arc(fertileStartDay, fertileEndDay)}
+                  />
+                  {feather > 0 && (
+                    <Circle
+                      cx={cx}
+                      cy={cy}
+                      r={bandR}
+                      stroke={c.fertile}
+                      strokeWidth={BAND_STROKE}
+                      strokeLinecap="round"
+                      fill="none"
+                      rotation={-90}
+                      origin={`${cx}, ${cy}`}
+                      opacity={0.55 * fertileOpacity}
+                      {...arc(fertileStartDay + feather / 2, fertileEndDay - feather / 2)}
+                    />
+                  )}
+                  {feather > 0 && (
+                    <Circle
+                      cx={cx}
+                      cy={cy}
+                      r={bandR}
+                      stroke={c.fertile}
+                      strokeWidth={BAND_STROKE}
+                      strokeLinecap="round"
+                      fill="none"
+                      rotation={-90}
+                      origin={`${cx}, ${cy}`}
+                      opacity={0.85 * fertileOpacity}
+                      {...arc(fertileStartDay + feather, fertileEndDay - feather)}
+                    />
+                  )}
+                </>
+              )}
+
+              {/* Ovulation — a single-day notch, never a wide arc (§2.3) */}
+              <Line
+                x1={xy(tickInner, ovulationDay).x}
+                y1={xy(tickInner, ovulationDay).y}
+                x2={xy(tickOuter, ovulationDay).x}
+                y2={xy(tickOuter, ovulationDay).y}
+                stroke={c.ovulation}
+                strokeWidth={3}
+                strokeLinecap="round"
+                opacity={lowConfidence ? 0.6 : 1}
+              />
+              <Circle
+                cx={xy(bandR, ovulationDay).x}
+                cy={xy(bandR, ovulationDay).y}
+                r={3.5}
+                fill={c.ovulation}
+                opacity={lowConfidence ? 0.6 : 1}
+              />
+
+              {/* Four subtle ticks: day 1 + phase boundaries (§2.3) */}
+              {[0, periodLength, fertileStartDay, fertileEndDay].map((d, i) => (
+                <Line
+                  key={`tick-${i}`}
+                  x1={xy(tickInner, d).x}
+                  y1={xy(tickInner, d).y}
+                  x2={xy(tickOuter, d).x}
+                  y2={xy(tickOuter, d).y}
+                  stroke={c.textMuted}
+                  strokeWidth={1.5}
+                  opacity={0.5}
+                />
+              ))}
+
+              {/* Elapsed progress — thin, on its own inner radius so it never fights the band */}
+              <AnimatedCircle
+                cx={cx}
+                cy={cy}
+                r={progressR}
+                stroke={c.todayMarker}
+                strokeWidth={PROGRESS_STROKE}
+                strokeLinecap="round"
+                fill="none"
+                rotation={-90}
+                origin={`${cx}, ${cy}`}
+                animatedProps={elapsedProps}
+              />
+
+              {/* Late: a dashed overflow arc growing one day at a time on an outer radius */}
+              {overflowDays > 0 && (
+                <Path
+                  d={arcPath(overflowR, 0, overflowDays)}
+                  stroke={c.periodLogged}
+                  strokeWidth={3}
+                  strokeDasharray="3 4"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              )}
+
+              {/* Today marker — filled dot with a background-coloured halo, highest contrast */}
+              {todayDay !== null && (
+                <>
+                  <Circle
+                    cx={xy(bandR, todayDay).x}
+                    cy={xy(bandR, todayDay).y}
+                    r={11}
+                    fill={c.surface}
+                  />
+                  <Circle
+                    cx={xy(bandR, todayDay).x}
+                    cy={xy(bandR, todayDay).y}
+                    r={6}
+                    fill={c.todayMarker}
+                  />
+                </>
+              )}
+            </>
+          )}
         </Svg>
-        {days.map((day, i) => {
-          const point = pointFor(i);
-          return (
-            <View
-              key={day.dateIso}
-              style={{
-                position: 'absolute',
-                left: point.x - numberBox / 2,
-                top: point.y - numberBox / 2,
-                width: numberBox,
-                height: numberBox,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text
-                style={{
-                  ...typography.caption,
-                  fontSize: numberBox < 20 ? 10 : typography.caption.fontSize,
-                  lineHeight: numberBox,
-                  color: textColorForState(day.state),
-                }}
-              >
-                {day.dayNumber}
-              </Text>
-            </View>
-          );
-        })}
-        {/* Today: a ring, not a fill, so the day number underneath stays readable — the
-            marker is the shape, matching DayCell's own "today" convention (§11.2). It sits
-            exactly on `numberBox`, adding no width of its own: day numbers are only ~29.6px
-            apart at a 28-day cycle (and under 19px at the 45-day maximum §5 allows), so every
-            pixel of padding here is a pixel of the neighbouring date covered. Contrast comes
-            from `todayRingColor` inverting against the fill, not from a second halo ring. */}
-        {todayPoint ? (
-          <View
-            style={{
-              position: 'absolute',
-              left: todayPoint.x - numberBox / 2,
-              top: todayPoint.y - numberBox / 2,
-              width: numberBox,
-              height: numberBox,
-              borderRadius: numberBox / 2,
-              borderWidth: 2,
-              borderColor: todayRingColor,
-            }}
-          />
-        ) : null}
       </View>
+
       <View
         style={{
           position: 'absolute',
@@ -270,11 +283,11 @@ export function CycleRing({ days, size = 288, strokeWidth = 24, children }: Cycl
           height: size,
           alignItems: 'center',
           justifyContent: 'center',
-          paddingHorizontal: strokeWidth * 2,
+          paddingHorizontal: BAND_STROKE * 2,
         }}
       >
         {children}
       </View>
-    </Animated.View>
+    </View>
   );
 }

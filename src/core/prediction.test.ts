@@ -209,15 +209,29 @@ describe('lateState (§5.7)', () => {
     });
   });
 
-  it('day window + 1: late', () => {
-    expect(lateState({ ...base, today: '2025-06-14' })).toEqual({ status: 'late', daysPast: 4 });
+  it('window+1 .. 7: no period logged yet; the start prompt appears from day 2 of the tier', () => {
+    expect(lateState({ ...base, today: '2025-06-14' })).toEqual({
+      status: 'noPeriodYet',
+      daysPast: 4,
+      showStartPrompt: false,
+    });
+    expect(lateState({ ...base, today: '2025-06-15' })).toEqual({
+      status: 'noPeriodYet',
+      daysPast: 5,
+      showStartPrompt: true,
+    });
   });
 
-  it('45 days since the last period start: offer to recalculate', () => {
-    expect(lateState({ ...base, today: '2025-06-27' })).toEqual({
-      status: 'offerRecalculate',
-      daysPast: 17,
-      daysSinceLastPeriodStart: 45,
+  it('8+ days past: predictions paused', () => {
+    expect(lateState({ ...base, today: '2025-06-18' })).toEqual({ status: 'paused', daysPast: 8 });
+    expect(lateState({ ...base, today: '2025-06-27' })).toEqual({ status: 'paused', daysPast: 17 });
+  });
+
+  it('60+ days since the last period start: long gap, re-anchor', () => {
+    expect(lateState({ ...base, today: '2025-07-12' })).toEqual({
+      status: 'longGap',
+      daysPast: 32,
+      daysSinceLastPeriodStart: 60,
     });
   });
 

@@ -4,7 +4,7 @@
  */
 import { addDays, daysBetween } from './dates';
 import type { Period } from './periods';
-import type { Prediction } from './prediction';
+import type { LateState, Prediction } from './prediction';
 
 /** The most recent period start on or before `today`; falls back to `today`. */
 export function lastPeriodStartOnOrBefore(
@@ -61,11 +61,6 @@ export function predictionDateRange(dateIso: string, window: number): Prediction
   return { single: null, start: addDays(dateIso, -window), end: addDays(dateIso, window) };
 }
 
-/** §6.2 week strip — 3 days before today, today, 3 days after. */
-export function weekStripDays(today: string): string[] {
-  return Array.from({ length: 7 }, (_, i) => addDays(today, i - 3));
-}
-
 export type DayCellState =
   'loggedPeriod' | 'ovulation' | 'fertile' | 'predictedPeriod' | 'loggedNoFlow' | 'none';
 
@@ -96,58 +91,146 @@ export function dayCellState(args: {
   return 'none';
 }
 
-export interface RingDay {
-  dateIso: string;
-  /** 1-based day within the ring's cycle, not the calendar day-of-month. */
-  dayNumber: number;
-  state: Exclude<DayCellState, 'loggedNoFlow'>;
-  isToday: boolean;
+// ── Cycle-relative ring (UI/UX spec §2.2–2.7, adopted 2026-09-06; supersedes the
+//    calendar-month `monthRingDays`) ──────────────────────────────────────────────────────
+
+/** How honest the countdown can be about itself (§2.7 C, mapped onto the §5 Prediction). */
+export type EstimateTier = 'point' | 'tilde' | 'range';
+
+export function estimateTier(
+  p: Pick<Prediction, 'isIrregular' | 'predictionWindow' | 'cyclesUsed'>,
+): EstimateTier {
+  if (p.isIrregular) return 'range'; // σ > 7 — no point estimate at all (§2.7 C)
+  if (p.predictionWindow <= 1 && p.cyclesUsed >= 3) return 'point'; // tight, and enough history
+  return 'tilde'; // "~13 days" — a soft estimate, never a bare number before 3 cycles (§2.7 A)
 }
 
-// SPEC: 2026-09-05 — the Home cycle ring has no per-day flow log to consult (only the
-// current week's logs are loaded on Home), so it cannot distinguish `loggedNoFlow` the way
-// the calendar does. A day inside a `Period` range is shown as `loggedPeriod` on the strength
-// of the period record alone; every other precedence rule matches `dayCellState`. See
-// DECISIONS.md.
-function ringDayState(
-  dateIso: string,
-  periods: Pick<Period, 'start_date' | 'end_date'>[],
-  prediction: Pick<
-    Prediction,
-    'ovulationDate' | 'fertileStart' | 'fertileEnd' | 'nextPeriodStart' | 'nextPeriodEnd'
-  >,
-): Exclude<DayCellState, 'loggedNoFlow'> {
-  const inRange = (a: string, b: string) => dateIso >= a && dateIso <= b;
-  if (currentPeriod(periods, dateIso)) return 'loggedPeriod';
-  if (dateIso === prediction.ovulationDate) return 'ovulation';
-  if (inRange(prediction.fertileStart, prediction.fertileEnd)) return 'fertile';
-  if (inRange(prediction.nextPeriodStart, prediction.nextPeriodEnd)) return 'predictedPeriod';
-  return 'none';
+/** The phase the ring centre speaks to (§2.5 table). Numbers only — the screen maps to copy. */
+export type HeroPhase =
+  | { phase: 'menstruating'; cycleDay: number; periodDay: number }
+  | { phase: 'postPeriod'; cycleDay: number }
+  | { phase: 'fertile'; cycleDay: number; dayN: number; total: number }
+  | { phase: 'ovulation'; cycleDay: number }
+  | { phase: 'expectedNow'; cycleDay: number }
+  | { phase: 'luteal'; cycleDay: number; daysUntil: number; tier: EstimateTier }
+  | { phase: 'noPeriodYet'; cycleDay: number; daysPast: number; showStartPrompt: boolean }
+  | { phase: 'paused'; cycleDay: number }
+  | { phase: 'longGap' }
+  | { phase: 'noData' };
+
+export function heroPhase(args: {
+  periods: Pick<Period, 'start_date' | 'end_date'>[];
+  prediction: Prediction;
+  today: string;
+  late: LateState;
+}): HeroPhase {
+  const { periods, prediction, today, late } = args;
+  if (periods.length === 0) return { phase: 'noData' };
+
+  const anchor = lastPeriodStartOnOrBefore(periods, today);
+  const cd = cycleDay(anchor, today);
+
+  switch (late.status) {
+    case 'longGap':
+      return { phase: 'longGap' };
+    case 'paused':
+      return { phase: 'paused', cycleDay: cd };
+    case 'noPeriodYet':
+      return {
+        phase: 'noPeriodYet',
+        cycleDay: cd,
+        daysPast: late.daysPast,
+        showStartPrompt: late.showStartPrompt,
+      };
+    case 'expectedNow':
+      return { phase: 'expectedNow', cycleDay: cd };
+    case 'upcoming':
+    case 'periodStarted':
+      break;
+  }
+
+  const cp = currentPeriod(periods, today);
+  if (cp) {
+    return { phase: 'menstruating', cycleDay: cd, periodDay: periodDay(cp.start_date, today) };
+  }
+  if (today === prediction.ovulationDate) return { phase: 'ovulation', cycleDay: cd };
+  if (today >= prediction.fertileStart && today <= prediction.fertileEnd) {
+    return {
+      phase: 'fertile',
+      cycleDay: cd,
+      dayN: daysBetween(prediction.fertileStart, today) + 1,
+      total: daysBetween(prediction.fertileStart, prediction.fertileEnd) + 1,
+    };
+  }
+  if (today < prediction.fertileStart) return { phase: 'postPeriod', cycleDay: cd };
+  return {
+    phase: 'luteal',
+    cycleDay: cd,
+    daysUntil: Math.max(0, daysBetween(today, prediction.nextPeriodStart)),
+    tier: estimateTier(prediction),
+  };
 }
 
 /**
- * §16 Home ring — the current calendar month laid out as a ring (user request 2026-09-06,
- * supersedes the last-period-anchored cycle ring). One slot per real day of the month in the
- * active calendar system, so `dayNumber` is the day-of-month (1..32 in BS), not a cycle day.
- * `cells` is `getMonthGrid(...).cells`; fill cells (previous/next month) are dropped here.
- * Arc state per date reuses the same period / prediction ranges the cycle ring used.
+ * Everything `CycleRing` needs to draw one cycle-relative ring (§2.3): cycle day 1 at 12
+ * o'clock, length `L`, a phase band (menstruation + fertile + ovulation notch over a neutral
+ * remainder), an elapsed stroke, a today-marker, and — when late — a dashed overflow arc.
+ * All positions are 0-based day offsets from the anchor, in `[0, L]`.
  */
-export function monthRingDays(args: {
-  cells: { iso: string; day: number; fill: boolean }[];
-  today: string;
+export interface CycleRingModel {
+  length: number;
+  /** Menstruation arc length, days — the median logged duration once known (§2.7 G). */
+  periodLength: number;
+  fertileStartDay: number;
+  fertileEndDay: number;
+  /** Single day — drawn as a notch, never a wide arc (§2.3). */
+  ovulationDay: number;
+  /** Inner progress stroke length; parks at `length` once late (§2.7 D). */
+  elapsedDays: number;
+  /** Today-marker position; `null` in the zero-data ghost state. */
+  todayDay: number | null;
+  /** Dashed outer arc length past 12 o'clock; 0 unless late. */
+  overflowDays: number;
+  /** Paused / long-gap — the ring is dimmed and does not advance. */
+  frozen: boolean;
+  /** Zero logged periods — render a 15%-opacity ghost ring and a centred CTA (§2.7 B). */
+  ghost: boolean;
+  /** Zero completed cycles — draw the predicted arcs faint and extra-feathered (§2.7 A). */
+  lowConfidence: boolean;
+  /** Gradient fade width at predicted-arc ends, in days (§2.4). */
+  featherDays: number;
+}
+
+export function cycleRingModel(args: {
   periods: Pick<Period, 'start_date' | 'end_date'>[];
-  prediction: Pick<
-    Prediction,
-    'ovulationDate' | 'fertileStart' | 'fertileEnd' | 'nextPeriodStart' | 'nextPeriodEnd'
-  >;
-}): RingDay[] {
-  const { cells, today, periods, prediction } = args;
-  return cells
-    .filter((c) => !c.fill)
-    .map((c) => ({
-      dateIso: c.iso,
-      dayNumber: c.day,
-      state: ringDayState(c.iso, periods, prediction),
-      isToday: c.iso === today,
-    }));
+  prediction: Prediction;
+  today: string;
+  late: LateState;
+}): CycleRingModel {
+  const { periods, prediction, today, late } = args;
+  const L = Math.max(1, prediction.avgCycleLength);
+  const anchor = lastPeriodStartOnOrBefore(periods, today);
+  const elapsed0 = cycleDay(anchor, today) - 1;
+
+  const clampDay = (n: number) => Math.max(0, Math.min(L, n));
+  const isLate =
+    late.status !== 'upcoming' && late.status !== 'periodStarted' && late.status !== 'expectedNow';
+  const parked = isLate ? L : Math.min(L, elapsed0);
+  const ghost = periods.length === 0;
+
+  return {
+    length: L,
+    periodLength: clampDay(Math.max(1, prediction.avgPeriodLength)),
+    fertileStartDay: clampDay(daysBetween(anchor, prediction.fertileStart)),
+    fertileEndDay: clampDay(daysBetween(anchor, prediction.fertileEnd)),
+    ovulationDay: clampDay(daysBetween(anchor, prediction.ovulationDate)),
+    elapsedDays: parked,
+    todayDay: ghost ? null : parked,
+    overflowDays:
+      late.status === 'noPeriodYet' || late.status === 'paused' ? Math.min(L, late.daysPast) : 0,
+    frozen: late.status === 'paused' || late.status === 'longGap',
+    ghost,
+    lowConfidence: prediction.cyclesUsed === 0,
+    featherDays: Math.max(1, prediction.predictionWindow),
+  };
 }
