@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   NativeSyntheticEvent,
   ScrollView,
@@ -146,13 +146,16 @@ export default function Onboarding() {
 
   const [submitting, setSubmitting] = useState(false);
 
-  const today = todayIso();
-  const thisYear = currentYear();
-  const dateChoices = quickDateChoices(today);
-  const yearRange = birthYearRange(thisYear);
-  const yearChoices = birthYearQuickChoices(thisYear);
+  // Lazy init: read once at mount, not on every keystroke — also stops the seed range
+  // shifting if the user crosses midnight mid-flow.
+  const [today] = useState(() => todayIso());
+  const [thisYear] = useState(() => currentYear());
+  const dateChoices = useMemo(() => quickDateChoices(today), [today]);
+  const yearRange = useMemo(() => birthYearRange(thisYear), [thisYear]);
+  const yearChoices = useMemo(() => birthYearQuickChoices(thisYear), [thisYear]);
   const yearMin = yearRange[yearRange.length - 1];
   const yearMax = yearRange[0];
+  const isSelectableStart = useCallback((iso: string) => isSelectableStartDate(today, iso), [today]);
 
   const cycleLength = parseNumberInput(cycleLengthText, CYCLE_LENGTH_MIN, CYCLE_LENGTH_MAX);
   const periodLength = parseNumberInput(periodLengthText, PERIOD_LENGTH_MIN, PERIOD_LENGTH_MAX);
@@ -198,7 +201,10 @@ export default function Onboarding() {
     }
   };
 
-  const pageStyle: PageStyle = { width, paddingHorizontal: spacing.xl, paddingTop: spacing.xxl };
+  const pageStyle: PageStyle = useMemo(
+    () => ({ width, paddingHorizontal: spacing.xl, paddingTop: spacing.xxl }),
+    [width],
+  );
 
   const cycleLengthError = numberFieldError(cycleLength.error, CYCLE_LENGTH_MIN, CYCLE_LENGTH_MAX, false);
   const periodLengthError = numberFieldError(periodLength.error, PERIOD_LENGTH_MIN, PERIOD_LENGTH_MAX, false);
@@ -268,7 +274,7 @@ export default function Onboarding() {
                 system={calendarSystem}
                 today={today}
                 value={notSure ? null : startDate}
-                isSelectable={(iso) => isSelectableStartDate(today, iso)}
+                isSelectable={isSelectableStart}
                 onSelect={(iso) => {
                   setStartDate(iso);
                   setNotSure(false);

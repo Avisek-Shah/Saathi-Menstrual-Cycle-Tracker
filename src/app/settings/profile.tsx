@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 
 import { Button } from '../../components/ui/Button';
@@ -62,12 +62,13 @@ export default function ProfileScreen() {
   const update = useSettingsStore((s) => s.update);
   const changeAnchor = useSettingsStore((s) => s.changeAnchor);
 
-  const today = todayIso();
-  const thisYear = currentYear();
-  const yearRange = birthYearRange(thisYear);
-  const yearChoices = birthYearQuickChoices(thisYear);
+  const [today] = useState(() => todayIso());
+  const [thisYear] = useState(() => currentYear());
+  const yearRange = useMemo(() => birthYearRange(thisYear), [thisYear]);
+  const yearChoices = useMemo(() => birthYearQuickChoices(thisYear), [thisYear]);
   const yearMin = yearRange[yearRange.length - 1];
   const yearMax = yearRange[0];
+  const isSelectableStart = useCallback((iso: string) => isSelectableStartDate(today, iso), [today]);
 
   const [cycleLengthText, setCycleLengthText] = useState(String(settings.reported_cycle_length));
   const [periodLengthText, setPeriodLengthText] = useState(String(settings.reported_period_length));
@@ -212,7 +213,7 @@ export default function ProfileScreen() {
             system={settings.calendar_system}
             today={today}
             value={pendingAnchor}
-            isSelectable={(iso) => isSelectableStartDate(today, iso)}
+            isSelectable={isSelectableStart}
             onSelect={confirmAnchorChange}
           />
         ) : null}

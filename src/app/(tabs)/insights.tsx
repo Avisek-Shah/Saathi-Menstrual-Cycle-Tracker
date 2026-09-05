@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Text } from 'react-native';
+import { AppState, Text } from 'react-native';
 
 import type { JournalRow } from '../../core/journal';
 import { Card } from '../../components/ui/Card';
@@ -20,6 +20,10 @@ import { typography } from '../../theme/typography';
 // rows is a few weeks of daily logging per page, small enough to stay cheap on-device. See
 // DECISIONS.md.
 const JOURNAL_PAGE_SIZE = 20;
+// SPEC: §6.5 doesn't cap total journal depth. "Load more" tapped repeatedly is an unbounded
+// list mounted into a ScrollView; 500 rows (~1.3 years of daily logging) is a hard ceiling
+// so a determined tap-through can't grow it forever. See DECISIONS.md.
+const JOURNAL_MAX_ROWS = 500;
 
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
@@ -45,32 +49,58 @@ function toJournalRow(row: dailyLogs.LogRow): JournalRow {
 export default function InsightsScreen() {
   const router = useRouter();
   const system = useSettingsStore((s) => s.settings.calendar_system);
-  const { prediction, periods, ready } = useCycleStore();
-  const today = todayIso();
+  const prediction = useCycleStore((s) => s.prediction);
+  const periods = useCycleStore((s) => s.periods);
+  const ready = useCycleStore((s) => s.ready);
+
+  // Kept in state (not read in the render body) and refreshed on focus/foreground, matching
+  // Home and Calendar — otherwise "Cycle day N" on CycleOverviewCard goes stale across
+  // midnight while the tab stays mounted.
+  const [today, setToday] = useState(() => todayIso());
+  const refreshToday = useCallback(() => setToday(todayIso()), []);
+
+  useFocusEffect(useCallback(() => { refreshToday(); }, [refreshToday]));
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') refreshToday();
+    });
+    return () => sub.remove();
+  }, [refreshToday]);
 
   const [journalRows, setJournalRows] = useState<JournalRow[]>([]);
   const [journalDone, setJournalDone] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  // How many rows to re-fetch on focus: at least a page, but never fewer than what's already
+  // loaded — otherwise switching tabs after "Load more" silently drops rows back to one page.
+  const journalDepthRef = useRef(JOURNAL_PAGE_SIZE);
 
-  const loadFirstPage = useCallback(async () => {
-    const rows = await dailyLogs.getRecent(JOURNAL_PAGE_SIZE);
+  const refreshJournal = useCallback(async () => {
+    const minCount = journalDepthRef.current;
+    const rows = await dailyLogs.getRecent(minCount);
     setJournalRows(rows.map(toJournalRow));
-    setJournalDone(rows.length < JOURNAL_PAGE_SIZE);
+    journalDepthRef.current = rows.length;
+    setJournalDone(rows.length < minCount || rows.length >= JOURNAL_MAX_ROWS);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      void loadFirstPage();
-    }, [loadFirstPage]),
+      void refreshJournal();
+    }, [refreshJournal]),
   );
 
   const loadMore = async () => {
     if (loadingMore || journalDone || journalRows.length === 0) return;
     setLoadingMore(true);
     const oldest = journalRows[journalRows.length - 1].date;
-    const rows = await dailyLogs.getRecent(JOURNAL_PAGE_SIZE, oldest);
-    setJournalRows((prev) => [...prev, ...rows.map(toJournalRow)]);
-    setJournalDone(rows.length < JOURNAL_PAGE_SIZE);
+    const remaining = JOURNAL_MAX_ROWS - journalRows.length;
+    const rows = await dailyLogs.getRecent(Math.min(JOURNAL_PAGE_SIZE, remaining), oldest);
+    setJournalRows((prev) => {
+      const next = [...prev, ...rows.map(toJournalRow)];
+      journalDepthRef.current = next.length;
+      return next;
+    });
+    setJournalDone(rows.length < JOURNAL_PAGE_SIZE || journalDepthRef.current >= JOURNAL_MAX_ROWS);
     setLoadingMore(false);
   };
 

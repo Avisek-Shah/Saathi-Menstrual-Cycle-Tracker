@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { Pressable, Switch, Text, View } from 'react-native';
 
@@ -175,7 +176,9 @@ export default function SettingsScreen() {
         <SectionLabel label={en.settingsAboutSection} />
         <Card>
           <Text style={{ ...typography.caption, color: colors.textMuted }}>
-            {fill(en.settingsVersion, { version: '1.0.0' })}
+            {Constants.expoConfig?.version
+              ? fill(en.settingsVersion, { version: Constants.expoConfig.version })
+              : en.settingsVersionUnknown}
           </Text>
         </Card>
       </View>

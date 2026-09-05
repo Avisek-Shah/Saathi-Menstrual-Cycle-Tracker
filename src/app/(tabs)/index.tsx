@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState, View } from 'react-native';
 
 import { formatDate, formatDateRange } from '../../core/calendar';
@@ -39,9 +39,14 @@ export default function Home() {
   const router = useRouter();
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.update);
-  const { prediction, periods, todayLog, ready, refresh, saveLog } = useCycleStore();
+  const prediction = useCycleStore((s) => s.prediction);
+  const periods = useCycleStore((s) => s.periods);
+  const todayLog = useCycleStore((s) => s.todayLog);
+  const ready = useCycleStore((s) => s.ready);
+  const refresh = useCycleStore((s) => s.refresh);
+  const saveLog = useCycleStore((s) => s.saveLog);
 
-  const [today, setToday] = useState(todayIso());
+  const [today, setToday] = useState(() => todayIso());
   const [recalcDismissed, setRecalcDismissed] = useState(false);
   const [recentSymptoms, setRecentSymptoms] = useState<Symptom[]>([]);
 
@@ -83,6 +88,14 @@ export default function Home() {
       };
     }, [today]),
   );
+
+  // Hooks must run unconditionally above the `!ready` early return below, so the null-guard
+  // lives inside the memo rather than being handled by that return.
+  const ringDays = useMemo(() => {
+    if (!prediction) return [];
+    const anchorForRing = lastPeriodStartOnOrBefore(periods, today);
+    return cycleRingDays({ anchor: anchorForRing, cycleLength: prediction.avgCycleLength, today, periods, prediction });
+  }, [prediction, periods, today]);
 
   if (!ready || !prediction) {
     return <Screen />;
@@ -136,13 +149,6 @@ export default function Home() {
   const showIrregularNotice = prediction.isIrregular && !settings.irregular_notice_seen;
   const showRecalc = late.status === 'offerRecalculate' && !recalcDismissed;
 
-  const ringDays = cycleRingDays({
-    anchor,
-    cycleLength: prediction.avgCycleLength,
-    today,
-    periods,
-    prediction,
-  });
   // Mini-cards only ever show a date within the current cycle (≤45 days out per §5.5's
   // widest window), so the year is always implicit — dropping it here (but not from the
   // shared `formatDateRange`, which other screens use for genuinely cross-year spans) cuts

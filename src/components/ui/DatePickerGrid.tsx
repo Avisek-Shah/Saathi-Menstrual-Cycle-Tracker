@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import {
@@ -42,7 +42,10 @@ function monthOf(iso: string, system: CalendarSystem): { year: number; month: nu
 export function DatePickerGrid({ system, today, value, onSelect, isSelectable }: DatePickerGridProps) {
   const [cursor, setCursor] = useState(() => monthOf(value ?? today, system));
 
-  const grid = getMonthGrid(cursor.year, cursor.month, system, today);
+  const grid = useMemo(
+    () => getMonthGrid(cursor.year, cursor.month, system, today),
+    [cursor, system, today],
+  );
 
   return (
     <View>

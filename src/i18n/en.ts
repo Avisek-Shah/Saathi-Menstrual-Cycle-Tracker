@@ -66,6 +66,7 @@ export const en = {
   settingsAboutSection: 'About',
   settingsNotBuiltYet: 'Not available yet',
   settingsVersion: 'Version {version}',
+  settingsVersionUnknown: 'Version unavailable',
   settingsOn: 'On',
   settingsOff: 'Off',
   settingsNotifPeriodSoon: 'Period reminder',

@@ -1,4 +1,5 @@
 import { openDB } from '../client';
+import { SCHEMA_VERSION } from '../schema';
 
 export type CalendarSystem = 'AD' | 'BS';
 
@@ -50,7 +51,7 @@ export const SETTINGS_DEFAULTS: Settings = {
   notif_fertile_start: false,
   notif_daily_log: false,
   notif_daily_log_time: '20:00',
-  schema_version: 1,
+  schema_version: SCHEMA_VERSION,
   irregular_notice_seen: false,
   onboarding_seed_range: null,
   log_explainer_seen: false,

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, Pressable, type LayoutChangeEvent } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, type LayoutChangeEvent } from 'react-native';
 import type { MonthGrid, MonthCell } from '../../core/calendar';
 import { formatDate } from '../../core/calendar';
 import { dayCellState } from '../../core/home';
@@ -11,7 +11,6 @@ import type { Period } from '../../core/periods';
 import type { Prediction } from '../../core/prediction';
 import type { LogRow } from '../../db/repositories/dailyLogs';
 import { DayCell } from './DayCell';
-import NepaliDate, { dateConfigMap } from 'nepali-date-converter';
 
 interface MonthGridProps {
   grid: MonthGrid;
@@ -59,6 +58,16 @@ export function MonthGrid({
     ? Math.max(1, Math.min(MIN_TOUCH_TARGET, Math.floor(rowWidth / COLUMNS) - 2))
     : MIN_TOUCH_TARGET;
 
+  // One bound press handler per cell, rebuilt only when the grid itself or `onPressDay`
+  // changes — not on every render. Without this, `<DayCell onPress={() => onPressDay(iso)}>`
+  // would hand each cell a fresh closure every render and `React.memo(DayCell)` would never
+  // see equal props, so memoizing it would buy nothing.
+  const pressHandlers = useMemo(() => {
+    const map = new Map<string, () => void>();
+    for (const cell of grid.cells) map.set(cell.iso, () => onPressDay(cell.iso));
+    return map;
+  }, [grid, onPressDay]);
+
   return (
     <View>
       {/* Title + subtitle (§6.3: BS name + AD range in BS mode; AD title + empty subtitle in AD) */}
@@ -96,20 +105,19 @@ export function MonthGrid({
                 periods,
                 prediction,
               });
-              // BS day number: convert AD cell to BS. For fill cells this gives the BS number of the
-              // neighbouring-date, which is correct (§9 — grid is BS, so the corner label must be BS).
-              const bsLabel = (() => {
-                if (system !== 'BS') return undefined;
-                const bs = NepaliDate.fromAD(new Date(cell.iso + 'T12:00:00')).getBS();
-                return bs.date; // the BS day-of-month for this AD date
-              })();
+              // `getMonthGrid` already converted every cell (fill cells included) to its BS
+              // day-of-month when building a BS grid, so `cell.day` is already the right label
+              // — no need to re-run the AD→BS conversion here.
+              const bsLabel = system === 'BS' ? cell.day : undefined;
               // §6.3.1 — a future date is still tappable; the day sheet just renders it
               // read-only. It is dimmed here for the same reason `faded` dims a fill cell: it
               // reads as "not the current focus", not as disabled.
+              // A plain View, not a Pressable: `DayCell` below is the single interactive
+              // element (it owns accessibilityRole/Label/State) — wrapping it in a second
+              // Pressable doubled up the button role and the outer one carried no label.
               return (
-                <Pressable
+                <View
                   key={cell.iso}
-                  onPress={() => onPressDay(cell.iso)}
                   style={{
                     flex: 1,
                     paddingVertical: spacing.xs,
@@ -123,13 +131,13 @@ export function MonthGrid({
                     state={state}
                     isToday={isToday}
                     isSelected={cell.iso === selected}
-                    onPress={() => onPressDay(cell.iso)}
+                    onPress={pressHandlers.get(cell.iso)}
                     label={bsLabel}
                     faded={cell.fill}
                     hideWeekday
                     size={cellSize}
                   />
-                </Pressable>
+                </View>
               );
             })}
           </View>
@@ -142,19 +150,21 @@ export function MonthGrid({
   );
 }
 
+// §12 rule 6 — labels come from `en`, not literals. Ovulation's swatch is the same solid
+// `ovulationFill` the day cell itself uses (§11.2), not a ring on the fertile wash. Static —
+// hoisted out of `LegendRow` so it isn't rebuilt every render.
+const LEGEND_ITEMS = [
+  { label: en.legendPeriod, color: colors.primary },
+  { label: en.legendPredicted, color: colors.primaryMuted },
+  { label: en.legendFertile, color: colors.fertileMuted },
+  { label: en.legendOvulation, color: colors.ovulationFill },
+  { label: en.legendLogged, color: colors.surface, dot: true },
+];
+
 function LegendRow() {
-  // §12 rule 6 — labels come from `en`, not literals. Ovulation's swatch is now the same
-  // solid `ovulationFill` the day cell itself uses (§11.2), not a ring on the fertile wash.
-  const items = [
-    { label: en.legendPeriod, color: colors.primary },
-    { label: en.legendPredicted, color: colors.primaryMuted },
-    { label: en.legendFertile, color: colors.fertileMuted },
-    { label: en.legendOvulation, color: colors.ovulationFill },
-    { label: en.legendLogged, color: colors.surface, dot: true },
-  ];
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingVertical: spacing.md, paddingTop: spacing.sm }}>
-      {items.map((it) => (
+      {LEGEND_ITEMS.map((it) => (
         <View key={it.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: it.color, borderWidth: it.color === colors.surface ? 1 : 0, borderColor: colors.border }} />
           {it.dot ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.textMuted }} /> : null}

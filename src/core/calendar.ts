@@ -122,7 +122,11 @@ export function formatDateRange(
 export interface MonthCell {
   /** Date this cell represents. Always a real YYYY-MM-DD in local time, even for filler cells. */
   iso: IsoDate;
-  /** 1-based day-of-month in the displayed (AD or BS) month, or 0 for fill cells. */
+  /**
+   * 1-based day-of-month in the displayed (AD or BS) month. Fill cells (`fill: true`) carry
+   * the real day-of-month of the neighbouring date they represent, not 0 — `leadingFill`/
+   * `padToSixRows` below compute it the same way real cells do.
+   */
   day: number;
   /** True when the cell is a leading/trailing fill from the previous/next month. */
   fill: boolean;

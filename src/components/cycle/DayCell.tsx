@@ -1,4 +1,5 @@
 import { parseISO } from 'date-fns';
+import { memo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import type { DayCellState } from '../../core/home';
@@ -32,7 +33,10 @@ interface DayCellProps {
   size?: number;
 }
 
-export function DayCell({
+// Memoized: `MonthGrid` renders 42 of these and re-renders whenever unrelated store state
+// changes (§6.3). Only pays off because `MonthGrid` also hands each cell a stable `onPress`
+// (see `pressHandlers` there) — an inline closure would defeat the shallow prop comparison.
+export const DayCell = memo(function DayCell({
   dateIso,
   state,
   isToday,
@@ -106,7 +110,7 @@ export function DayCell({
       />
     </Pressable>
   );
-}
+});
 
 // §11.2 — colour is never the only signal; each state also carries a ring or a dot. Solid
 // fills (`loggedPeriod`, `ovulation`) additionally carry white text (see `onSolid` above).
