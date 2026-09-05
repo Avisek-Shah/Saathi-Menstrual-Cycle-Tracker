@@ -71,11 +71,17 @@ export default function CalendarScreen() {
     (delta: number) => {
       setCursor((c) => {
         const next = addMonth(c.year, c.month, delta);
-        if (delta > 0 && !canNext) return c;
+        // Checked against `next` (derived from the real prior `c`), not the outer `canNext` —
+        // that was a stale snapshot from render time. Two `goMonth(1)` calls batched together
+        // (rapid double-tap, or a swipe landing right after a button press) both closed over
+        // the same `canNext`, so the guard passed twice and the cursor skipped one month past
+        // `end`.
+        const overshoots = next.year > end.year || (next.year === end.year && next.month > end.month);
+        if (delta > 0 && overshoots) return c;
         return next;
       });
     },
-    [canNext],
+    [end],
   );
 
   const grid = useMemo(() => getMonthGrid(cursor.year, cursor.month, system, today), [cursor, system, today]);
@@ -149,11 +155,12 @@ export default function CalendarScreen() {
       <GestureDetector gesture={swipe}>
         <View style={{ gap: spacing.md }}>
           <View
+            // No horizontal padding of its own — `Screen` owns it, so the arrows line up with
+            // the grid's outer columns instead of sitting further in.
             style={{
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              paddingHorizontal: spacing.md,
             }}
           >
             <MonthNavButton

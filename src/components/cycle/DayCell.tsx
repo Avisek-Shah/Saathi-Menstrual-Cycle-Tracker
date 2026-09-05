@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import type { DayCellState } from '../../core/home';
 import { colors } from '../../theme/colors';
+import { MIN_TOUCH_TARGET } from '../../theme/spacing';
 import { typography } from '../../theme/typography';
 
 const WEEKDAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -24,6 +25,11 @@ interface DayCellProps {
   hideWeekday?: boolean;
   /** §6.3 — the day sheet's open date. Its own outer ring, distinct from today's inner ring. */
   isSelected?: boolean;
+  /**
+   * Outer circle diameter. Defaults to the §11.4 minimum touch target. The month grid passes a
+   * measured value so seven columns always fit the screen width — see `MonthGrid`.
+   */
+  size?: number;
 }
 
 export function DayCell({
@@ -36,7 +42,9 @@ export function DayCell({
   faded = false,
   hideWeekday = false,
   isSelected = false,
+  size = MIN_TOUCH_TARGET,
 }: DayCellProps) {
+  const inner = size - 4;
   const d = parseISO(dateIso);
   const fill = fillFor(state);
   // Solid-filled states get white text — a filled circle reads as "this happened / is
@@ -59,9 +67,9 @@ export function DayCell({
       )}
       <View
         style={{
-          width: 44,
-          height: 44,
-          borderRadius: 22,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
           alignItems: 'center',
           justifyContent: 'center',
           borderWidth: isSelected ? 2 : 0,
@@ -70,9 +78,9 @@ export function DayCell({
       >
         <View
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
+            width: inner,
+            height: inner,
+            borderRadius: inner / 2,
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor: fill,

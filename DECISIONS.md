@@ -14,6 +14,20 @@ Format:
 
 ---
 
+## 2026-09-04 — Fixed batched double-tap skipping past the §6.3 month cap
+**Spec section:** §6.3 ("cannot scroll past current month + 3")
+**Decision:** `goMonth` in `src/app/(tabs)/calendar.tsx` used to guard forward navigation with `if (delta > 0 && !canNext) return c;`, where `canNext` was a boolean computed once per render from the *outer* `cursor` state. Two `goMonth(1)` calls landing in the same React batch (a fast double-tap, or a swipe firing right after a button press) both closed over that same stale `canNext`: the first call legitimately advanced `c` to the cap month, the second call re-ran against the real updated `c` but still checked the old (pre-advance) `canNext`, so the guard passed again and the cursor landed one month past the cap. Replaced the check with one computed from `next` — itself derived from the true intermediate `c` inside the updater — compared against `end` (the cap), which is stable per render since it depends only on `today`/`system`, not `cursor`.
+**Reason:** User reported the calendar "automatically increases" past the last allowed month. Root cause was the stale-closure guard above, reproducible with a rapid double-tap on the next-month arrow at the cap.
+**Reversible?** yes — logic-only change to one function; no data model or spec-cap change.
+
+## 2026-09-04 — Month grid renders explicit 7-column rows instead of `flexWrap`
+**Spec section:** §6.3 (month grid), §11.4 (44px minimum touch target)
+**Decision:** `MonthGrid` no longer relies on `flexWrap` to break the 42-cell list into weeks. The cells are chunked into six rows of seven, each row a `flexDirection: 'row'` `View`, and both the weekday header and the day cells size their columns to `(width - padding * 2) / 7` from `useWindowDimensions`. `DayCell` gained an optional `size` prop (default `MIN_TOUCH_TARGET`) so the circle can follow the measured column width. Horizontal padding is now computed rather than fixed at `spacing.md`: it shrinks toward 0 before the day cells are allowed to fall under 44px.
+**Reason:** The old grid combined `flexWrap` with a hardcoded 44px cell width. Wrapping happens on measured width, so on a 393pt screen the row fit eight cells, not seven — every week was shifted and the day numbers no longer lined up with the S/M/T/W/T/F/S header (Bhadra 19 2083, a Friday, rendered in the Wednesday column). `src/core/calendar.ts` was correct throughout; this was purely a layout bug. The header's `justifyContent: 'space-around'` was separately misaligned from the cells and is now column-aligned to the same width.
+**Reversible?** yes — presentation only; no change to `src/core/calendar.ts`, the grid data, or storage.
+
+**Follow-up, same day:** the first version of this fix sized columns as `(windowWidth - padding * 2) / 7`, which ignored the `paddingHorizontal: spacing.lg` that `Screen` already applies. The row came out 32pt wider than its container and hung off the right edge. Columns are now `flex: 1` — they divide whatever container they are given into seven, so no width arithmetic can disagree with the real layout — and the container is measured with `onLayout` purely to pick the circle diameter. `MonthGrid`'s title, grid and legend, and the calendar screen's month-arrow row, dropped their own horizontal padding so every element shares `Screen`'s single inset and lines up on one left edge.
+
 ## 2026-09-01 — Version bumped to 1.1.0; `versionCode` left at 1
 **Spec section:** BUILD_PLAN §8 "Versioning"
 **Decision:** `package.json`, `app.json` (`expo.version`), and `package-lock.json` bumped 1.0.0 → 1.1.0 (minor — the M10 UX pass and the calendar-highlight fix are new user-facing behaviour, not just a patch). `app.json`'s `android.versionCode` left at `1`.
@@ -155,3 +169,9 @@ Format:
 **Decision:** Recorded in BUILD_PLAN that Insights charts (M6), the notification/PIN/export services (M7), and five of the six Learn articles (M8) do not exist in the repository despite commits describing them as complete. Settings rows for unbuilt features render disabled.
 **Reason:** The plan asserted work that the tree does not contain, and §15 acceptance depends on it. A disabled row is honest; a row that silently does nothing is not.
 **Reversible?** no — this is a correction of the record.
+
+## 2026-09-04 — App icon config + animated splash handoff (off-plan, not a BUILD_PLAN milestone)
+**Spec section:** none (REQUIREMENTS.md has no icon/splash visual-identity section); §2 tech stack
+**Decision:** Added `expo-splash-screen` (new dependency, not in §2's table — user explicitly approved before it was added). Configured native splash via the plugin in `app.json` (image `assets/splash-icon.png`, `backgroundColor` `#FFF9FB` matching `colors.bg`) instead of the legacy top-level `splash` key. `src/app/_layout.tsx` now freezes the native splash, hides it the instant a same-look JS overlay mounts, then runs a Reanimated bloom/fade using the already-installed `react-native-reanimated` — no `lottie-react-native` added. Existing hydration/onboarding-redirect logic in that file was preserved, not replaced.
+**Reason:** User asked for a discreet icon + animated splash workflow. Neither is a BUILD_PLAN milestone and M6/M7/M8 are still incomplete per the 2026-08-31 carryover note; user explicitly chose to do this now as standalone work anyway, and explicitly approved the one new dependency required (there is no way to control native-splash freeze/hide without `expo-splash-screen`).
+**Reversible?** yes — config-only plus one additive file change; no data model or domain-rule impact.

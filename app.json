@@ -13,7 +13,16 @@
     ],
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFF9FB",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 160,
+          "resizeMode": "contain"
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": true,
