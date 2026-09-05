@@ -8,6 +8,10 @@
 
 This is the complete build specification for v1. Build in the milestone order given in `BUILD_PLAN.md`. Where this document specifies an algorithm, schema, or enum, implement it exactly — do not substitute an equivalent. Where something is genuinely unspecified, follow §18 and pick the simplest option, then record it in `DECISIONS.md`.
 
+### UI/UX authority
+
+`SAATHI_UIUX_SPEC.md` was adopted on 2026-09-06 (see `DECISIONS.md`) as the authority for all screen layout, cycle visualization, colour, user-facing copy, and interaction detail. This document stays authoritative for the domain rules (§3), the data model (§4), the prediction engine (§5 — the UI/UX spec §1 confirms the engine is correct and is not to be changed), notification copy (§7), the PIN (§8), and the BS calendar (§9). Where the two disagree on UI, the UI/UX spec wins. Its §13 build order is milestones M11–M13 (§16, and `BUILD_PLAN.md` §6c).
+
 ---
 
 ## 1. Product summary
@@ -261,12 +265,16 @@ Also set `isIrregular = true` if any of the last 3 cycles was an outlier (outsid
 
 ### 5.7 Late periods
 
-If `today > nextPeriodStart` and no flow has been logged since:
+If `today > nextPeriodStart` and no flow has been logged since, tier by how many days past `nextPeriodStart` today is. The ring behaviour and exact copy for each tier are UI/UX spec §2.5 and §2.7 D–E.
 
-- Days 1–`predictionWindow` past: home shows "Expected around now".
-- Beyond that: "N days later than expected" with a neutral tone.
-- At 45 days since last period start: show a one-time card offering to reset the prediction anchor ("My cycle has changed — recalculate"), which simply forces the prediction to re-anchor on the last logged period.
+- **1 to `predictionWindow` days past** — "Expected around now". Ring renders normally.
+- **`predictionWindow`+1 to 7 days past** — "No period logged yet". The today-marker parks at the day-1 boundary; a dashed overflow arc on an outer radius grows one day at a time. On the 2nd day past `predictionWindow`, an inline prompt appears once: "Did your period start? [Yes, log it] [Not yet]".
+- **8+ days past** — "Predictions paused until you log your next period." The ring freezes; no countdown, no point estimate.
+- **60+ days since the last logged flow of any kind** — replace the home ring with one re-anchor card: "It's been a while. When did your last period start?". Do not accumulate phantom cycle days.
+- Never surface pregnancy, testing, or possible causes, in any tier.
 - **Never auto-log a period the user did not enter.**
+
+The former day-45 "My cycle has changed — recalculate" card is retired; the 8-day pause and the 60-day re-anchor card replace it.
 
 ### 5.8 Recalculation triggers
 
@@ -300,21 +308,15 @@ On finish: write settings, seed `daily_logs` with flow for the reported last per
 
 ### 6.2 Home
 
-Vertical scroll. In order:
+Single vertical priority stack (UI/UX spec §3). In order:
 
-1. **Status card** (the hero, ~40% of the first viewport)
-   - Large: days until next period ("Period in **6 days**"), or during a period "Day **3** of your period", or when late "**2 days** later than expected".
-   - Beneath: the predicted date, formatted per `calendar_system`, with `± window` shown as a range when window > 1.
-   - Cycle day indicator: "Cycle day 17".
-   - Confidence pill: `low` shows "estimate — keep logging"; `medium` and `high` show nothing. Only surface confidence when it's low enough to matter.
-2. **Primary action button** — context-aware:
-   - Not on a period → "Log today"
-   - No log for today and a period is expected → "My period started"
-   - On a period → "Log today"
-3. **Quick-log row** — at most five one-tap chips that write immediately without opening a modal: the flow level (when on a period) and the user's most-used recent symptoms. A tap **merges** into today's existing log — it never replaces mood, symptoms, or a note already saved for that day. Tapping a selected chip removes that value again. Hidden when `quick_log_enabled` is false.
-4. **This week strip** — 7 day-circles (3 before today, today, 3 after) each colour-coded by state (§11.2), tappable to open the log modal for that date.
-5. **Fertile window card** — dates, days-until, and the line: _"An estimate. Not reliable as birth control."_ This line is not dismissible and is always present on this card.
-6. **Today's log summary** — if logged, a compact chip row of flow/mood/symptoms with an edit affordance; if not, an empty prompt.
+1. **Cycle ring** (the hero) — cycle-relative, never calendar-synced: ring day 1 is the first day of the current cycle at 12 o'clock, length = `avgCycleLength`. **No numerals on the rim.** Four layers: a phase band (menstruation / fertile / neutral luteal remainder), a single ovulation notch, a thin elapsed stroke on an inner radius, and the today-marker. Predicted arcs have feathered gradient ends; logged arcs are hard-edged. Centre shows at most three lines — eyebrow ("Cycle day 18"), a phase-dependent hero string (UI/UX spec §2.5 table), and a small chip ("estimate"). Geometry, uncertainty rendering, and edge cases (late, irregular, zero-data ghost ring) are UI/UX spec §2.3–2.7.
+2. **14-day linear strip** — horizontally scrollable, today at ~35% from the left. Per column: weekday, date, one status glyph, a small dot if a log exists. Tapping a column opens that day's log sheet. This is where exact dates live; it makes the ring's abstraction safe.
+3. **Primary action button** — "Log today", full-width, **sticky above the tab bar**. Label is context-aware: → "My period started" when a period is expected and today has no flow.
+4. **Quick-log row** — unchanged: at most five one-tap chips writing immediately without a modal, merge semantics (never replaces mood/symptoms/note already saved; tapping a selected chip removes that value). Hidden when `quick_log_enabled` is false.
+5. **One phase-aware context card** — a single card whose contents change by phase (menstruating / fertile / luteal / late / `loggedCycles < 3`). The fertile-phase variant carries the birth-control disclaimer _"An estimate. Not reliable as birth control."_ as a bordered callout — not dismissible, always present in that phase (UI/UX spec §3).
+
+The three separate stat cards (cycle day / next period / ovulation) are removed — cycle day is the ring eyebrow, next period is the hero, ovulation is on the ring and strip. Insights → Cycle overview (§6.5) stays the one place all values are listed together.
 
 ### 6.3 Calendar
 
@@ -480,28 +482,43 @@ The words "period", "cycle", "fertile", and the app name must not appear in any 
 
 ### 11.1 Direction
 
-Soft, conventional period-app aesthetic. Warm and calm, not clinical, not childish. Rounded corners (12–16px), generous whitespace, one accent colour used sparingly for emphasis rather than everywhere.
+Soft, conventional period-app aesthetic. Warm and calm, not clinical, not childish. Rounded corners (12–16px), generous whitespace, one accent colour used sparingly for emphasis rather than everywhere. Menstruation stays rose; fertility sits on the blue-violet axis, not green — the pink/green pair collapses under red-green colour blindness (UI/UX spec §2.8).
 
 ### 11.2 Palette
 
-| Token           | Hex       | Use                                                   |
-| --------------- | --------- | ----------------------------------------------------- |
-| `bg`            | `#FFF9FB` | App background                                        |
-| `surface`       | `#FFFFFF` | Cards                                                 |
-| `primary`       | `#E8637C` | Period days, primary buttons                          |
-| `primaryMuted`  | `#F0A0B6` | Predicted period days                                 |
-| `fertile`       | `#7FB3A8` | Fertile window (accent use, e.g. card text)           |
-| `fertileMuted`  | `#9FD0C2` | Fertile window fill                                   |
-| `ovulation`     | `#4E8D80` | Ovulation accent (non-fill uses)                      |
-| `ovulationFill` | `#3A6A5F` | Ovulation day-cell solid fill, paired with white text |
-| `text`          | `#2E2A2C` | Primary text                                          |
-| `textMuted`     | `#7C7378` | Secondary text                                        |
-| `border`        | `#F0E4E8` | Dividers                                              |
-| `warning`       | `#D9A441` | Outlier / irregular markers                           |
+Adopted from UI/UX spec §2.8 (2026-09-06). Menstruation stays rose; fertility moved off green onto the blue-violet axis so the palette survives deuteranopia. The full token set — light and dark — lives in `src/theme/colors.ts`; `src/theme/palette.ts` resolves the active scheme and the colour-blind mode.
 
-**Day-cell states:** logged period (`primary` fill, white text), predicted period (`primaryMuted` fill), fertile (`fertileMuted` fill), ovulation (`ovulationFill` — solid, white text, same treatment as a logged period), today (2px `text` ring, layered over any other state), logged-but-no-flow (small `textMuted` dot). (Revised 2026-08-31 — ovulation previously shared `fertileMuted` with a thin ring; the ring was too subtle to read as informational at a glance, so ovulation now gets its own solid colour the way a logged period does. See DECISIONS.md.)
+| Token             | Light     | Dark      | Use                                     |
+| ----------------- | --------- | --------- | --------------------------------------- |
+| `bg`              | `#FFF9FB` | `#141013` | App background                          |
+| `surface`         | `#FFFFFF` | `#1E1A1C` | Cards                                   |
+| `periodLogged`    | `#D64C6E` | `#F1809B` | Logged period days, primary buttons     |
+| `periodPredicted` | `#F2A9BC` | `#8E5566` | Predicted period days (+ dashed border) |
+| `fertile`         | `#8B9DE8` | `#A8B6F0` | Fertile window fill / accent            |
+| `ovulation`       | `#4A5BAF` | `#7B8AD6` | Ovulation notch / day-cell fill         |
+| `neutralTrack`    | `#E8E1E3` | `#3A3335` | Ring luteal remainder, empty track      |
+| `todayMarker`     | `#1F1A1C` | `#FFFFFF` | Today marker / ring                     |
+| `text`            | `#2E2A2C` | `#F2EDEF` | Primary text                            |
+| `textMuted`       | `#7C7378` | `#A79DA2` | Secondary text                          |
+| `border`          | `#F0E4E8` | `#332D30` | Dividers                                |
+| `warning`         | `#D9A441` | `#E6B860` | Outlier / irregular markers             |
 
-Every fill/text pairing on this page is checked against WCAG AA (4.5:1) for the text colour it actually sits behind, not picked by eye — see the comment above the `colors` object in `src/theme/colors.ts`.
+`primary` is an alias of `periodLogged`. Any §2.8 value that fails its own contrast bar — 3:1 for non-text arcs against the card background, 4.5:1 for ring-centre text (WCAG 1.4.11 / 1.4.3) — is darkened minimally within its hue and recorded in `DECISIONS.md` and the `colors.ts` header comment, as was already done for `ovulationFill`.
+
+**Colour is never the only carrier of meaning.** Every state also carries at least two of: hue, luminance, texture, glyph.
+
+| State            | Hue        | Fill  | Texture       | Glyph           |
+| ---------------- | ---------- | ----- | ------------- | --------------- |
+| Logged period    | Rose       | Solid | —             | Droplet         |
+| Predicted period | Rose       | 40%   | Dashed border | Droplet outline |
+| Fertile          | Periwinkle | 25%   | —             | —               |
+| Ovulation        | Indigo     | Solid | —             | Small diamond   |
+| Logged, no flow  | Neutral    | None  | —             | Small dot       |
+| Today            | —          | None  | 2dp ring      | —               |
+
+A **Colour-blind friendly** toggle (`color_blind_mode` setting) swaps to a monochrome + glyph scheme.
+
+Dark-theme wiring lands in M13; until then only the light column is active, but both columns exist as tokens so the switch stays a single-file change (§11.5).
 
 Colour must never be the only carrier of meaning — every state also has a shape, ring, or dot.
 
@@ -518,7 +535,7 @@ System font. Scale: 34 (hero number), 24 (screen title), 18 (card title), 15 (bo
 
 ### 11.5 Dark mode
 
-Not in v1. But define all colours as tokens in `src/theme/colors.ts` so a dark palette is a single-file addition later.
+Full dark theme lands in M13 (UI/UX spec §10 — "health apps get opened at 2am"). Both palette columns already exist as tokens in `src/theme/colors.ts`; M13 wires the scheme switch and honours the OS setting — it does not pick new colours.
 
 ### 11.6 Layout and safe areas
 
@@ -697,6 +714,11 @@ Full detail in `BUILD_PLAN.md`. Summary:
 | **M8**    | Learn articles                                                                                                                                                                                                 |
 | **M9**    | Edge cases (§10), accessibility pass, EAS APK build, expo-updates wiring                                                                                                                                       |
 | **M10**   | UX pass: safe areas (§11.6), onboarding input + editable profile (§6.1, §6.7), calendar day sheet and swipe (§6.3), Home quick-log (§6.2), log reframe (§6.4), journal + cycle overview (§6.5), motion (§11.7) |
+| **M11**   | UI/UX rebuild sprint 1 (P0, trust): cycle-relative ring with no numerals, 14-day linear strip, phase-aware hero + one date model, blue-violet palette + texture grammar + colour-blind mode, calendar legend 3-up, notifications section hidden, UTC+05:45 date-storage audit. UI/UX spec §2–4, §11.4, §13 |
+| **M12**   | UI/UX rebuild sprint 2 (P1, comprehension): full log bottom sheet (§6), Insights cycle-history bar chart + statistics block (§5 — the never-built M6), privacy-first onboarding pass (§8), TalkBack + 200% font scaling (§10), single-commit settings + complete Data section (§7), `src/core/` purity confirmation (§11.3). UI/UX spec §5–10, §13 |
+| **M13**   | UI/UX rebuild sprint 3 (P2): symptom heat strip (§5), dark-theme wiring (§2.8, §10), PDF export (§5 — needs `expo-print` + `expo-sharing`, ask first), calendar cycle bands + jump-to-month (§4), haptics + micro-interactions + empty states (§12 — needs `expo-haptics`, ask first). UI/UX spec §5, §10, §12, §13 |
+
+M11–M13 replace the UI/UX-facing scope of the never-completed M6 (Insights charts) and part of M7 (settings polish). Notifications and the PIN lock stay deferred M7 scope — see `BUILD_PLAN.md` §6c.
 
 M2 before M4 is deliberate — the prediction logic is the product, and it should be correct in isolation before any screen depends on it.
 

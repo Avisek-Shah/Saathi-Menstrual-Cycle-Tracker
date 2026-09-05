@@ -264,6 +264,41 @@ Spec: §6.1, §6.2, §6.3, §6.3.1, §6.4, §6.5, §6.7, §10.10–13, §11.6, �
 
 ---
 
+## 6c. Phase G — UI/UX rebuild (M11–M13)
+
+`SAATHI_UIUX_SPEC.md` was adopted as the UI/UX authority on 2026-09-06 (`DECISIONS.md`). It is a review-and-rebuild of the shipped surface: a cycle-relative ring, one honest date model, a colour-blind-safe palette, phase-aware copy, real Insights charts. Its §13 build order maps to three milestones. The prediction engine (§5) is affirmed correct by the UI/UX spec §1 and is not touched.
+
+### M11 — Sprint 1 (P0, trust)
+
+Five commits, in order:
+
+| Sub-step | Contents                                                                                                                                                                            |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1a       | Doc reconciliation — this section, REQUIREMENTS §0/§5.7/§6.2/§11.1/§11.2/§11.5/§16, `DECISIONS.md` entries                                                                            |
+| 1b       | Blue-violet palette (§2.8), two-signal texture/glyph grammar, `color_blind_mode` setting + Settings toggle + `palette.ts` resolver                                                     |
+| 1c       | Cycle-relative ring rebuild (§2.2–2.7) — 4 layers, feathered predicted arcs, no numerals, late / ghost states, `strokeDasharray` sweep; `core/home.ts` `cycleRingDays()` + `heroState()` + tests |
+| 1d       | 14-day linear strip (§2.6, horizontal `FlatList`), delete the 3 stat cards, sticky "Log today", fertile disclaimer as a bordered callout                                               |
+| 1e       | Calendar legend 3-up (§4), hide the notifications section (§7 — user chose "hide", not "implement"), UTC+05:45 date-storage audit (§11.4)                                               |
+
+**Done when:** the UI/UX spec §14 ring acceptance checklist passes, `npm test` + `npm run typecheck` are green, and the sensitive-copy rules in REQUIREMENTS §5.6 / §6.2 / §7 / §8 still hold — late-period wording changes per `DECISIONS.md` 2026-09-06 (A1); nothing else moves.
+
+### M12 — Sprint 2 (P1, comprehension)
+
+Full log bottom sheet (§6); Insights cycle-history bar chart + statistics block (§5 — this is the never-built M6); privacy-first onboarding pass (§8); TalkBack labels + 200% font scaling (§10); single-commit settings model + complete Data section (§7); confirm `src/core/` is dependency-free (§11.3). Charts use `react-native-svg` + `react-native-reanimated` only — no charting dependency (§11.1).
+
+### M13 — Sprint 3 (P2)
+
+Symptom-pattern heat strip (§5); dark-theme wiring (§2.8, §10 — colour-blind mode already shipped in M11); PDF export for clinician visits (§5 — needs `expo-print` + `expo-sharing`, **ask before adding**); calendar cycle bands + jump-to-month (§4); haptics + micro-interactions + empty states (§12 — needs `expo-haptics`, **ask before adding**).
+
+### Still owed from earlier phases, not covered by M11–M13
+
+- **Notifications** (M7) — the user chose to hide the section in M11, not implement it. Local scheduling with `expo-notifications` is still required for §15 acceptance and stays M7 scope.
+- **PIN app lock** (M7) — stays a disabled row through M11. Needs `expo-secure-store` + `expo-local-authentication`.
+- **Delete all data / export** (M7).
+- **Learn articles 1–4 and 6** (M8) — only article 5 exists.
+
+---
+
 ## 7. Phase E — Release
 
 ### R1 — Build configuration

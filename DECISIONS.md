@@ -14,6 +14,48 @@ Format:
 
 ---
 
+## 2026-09-06 — `SAATHI_UIUX_SPEC.md` adopted as the UI/UX authority
+
+**Spec section:** REQUIREMENTS §0 (document precedence); CLAUDE.md rule 1
+**Decision:** `SAATHI_UIUX_SPEC.md` — a review-and-rebuild spec for the shipped surface — now governs all screen layout, cycle visualization, colour, user-facing copy, and interaction detail. REQUIREMENTS.md stays authoritative for the domain rules (§3), the data model (§4), the prediction engine (§5 — the UI/UX spec §1 explicitly affirms the engine is correct and is left untouched), notification copy (§7), the PIN (§8), and the BS calendar (§9). Where the two disagree on UI, the UI/UX spec wins. REQUIREMENTS §0/§5.7/§6.2/§11.1/§11.2/§11.5/§16 and BUILD_PLAN §6c were updated to match. The UI/UX spec §13 build order becomes M11–M13.
+**Reason:** User instruction 2026-09-06 ("UIUX spec wins; rewrite the rest"), after the conflicts with REQUIREMENTS.md, the CLAUDE.md sensitive-areas list, and prior decisions were enumerated.
+**Reversible?** costly — three milestones of UI work follow from it.
+
+## 2026-09-06 — Home ring reverted to cycle-relative, numerals removed
+
+**Spec section:** UI/UX spec §2.2, §2.3, §2.9, §14; supersedes the 2026-09-05 "Home status card replaced with the SVG cycle-day ring", 2026-09-05 "Ring gets per-day numbers", 2026-09-06 "Home ring switched from a last-period cycle to the current calendar month", 2026-09-06 "Cycle-ring round end-caps no longer overshoot", and 2026-09-06 "Ring's predicted-period arc keeps the soft pink" entries
+**Decision:** The ring is cycle-relative again: day 1 at 12 o'clock = first day of the current cycle, length = `avgCycleLength`, drawn as a phase band (menstruation / fertile / neutral luteal remainder) + a single ovulation notch + a thin inner elapsed stroke + a today-marker with a background-coloured halo. No day-of-month numbers, no cycle-day numbers, no numerals on the rim — four subtle ticks only (day 1 + phase boundaries). `monthRingDays()` / `currentMonthFor()` in `core/home.ts` / `core/calendar.ts` are replaced by `cycleRingDays()`. Predicted arcs get feathered `linearGradient` ends; the calendar-month layout is gone from Home.
+**Reason:** UI/UX spec §2.2 ("cycle-relative, never calendar-synced") and §2.9 ("day numbers 1–30 on the rim — root cause of the current ambiguity"). The 2026-09-06 calendar-month ring was built to a user request that the UI/UX spec review identifies as the core comprehension bug (its §1 items 1–3).
+**Reversible?** yes — `cycleRingDays()` is a drop-in swap at one call site; the superseded functions are in git history.
+
+## 2026-09-06 — Fertility palette moved to the blue-violet axis
+
+**Spec section:** REQUIREMENTS §11.2, UI/UX spec §2.8; supersedes the 2026-08-31 "Calendar highlight colours darkened; ovulation gets its own solid fill" entry
+**Decision:** `fertile` / `fertileMuted` / `ovulation` / `ovulationFill` (teal-green family) are replaced by `fertile` `#8B9DE8` and `ovulation` `#4A5BAF` (periwinkle / indigo). `primary` becomes an alias of `periodLogged` `#D64C6E`. `periodPredicted` `#F2A9BC`, `neutralTrack` `#E8E1E3`, and `todayMarker` `#1F1A1C` are added. Dark-column values are defined for every token but not yet wired (M13). A two-signal texture/glyph grammar is added — dashed border + droplet-outline on predicted period, diamond on ovulation, dot on logged-no-flow — plus a `color_blind_mode` monochrome scheme. Any value failing its own §2.8 contrast bar is darkened minimally within-hue and recorded here.
+**Reason:** UI/UX spec §2.8 — "the current pink-vs-green palette collapses under deuteranopia (~8% of males)". User chose "adopt UIUX blue-violet palette + CB toggle" on 2026-09-06.
+**Reversible?** yes — token values only; no schema or algorithm change.
+
+## 2026-09-06 — 14-day linear strip replaces WeekStrip on Home; three stat cards deleted
+
+**Spec section:** UI/UX spec §2.6, §3; supersedes the 2026-09-05 "Ring gets per-day numbers; `WeekStrip` removed from Home" entry (the WeekStrip-removal half)
+**Decision:** A horizontally-scrollable 14-day strip (today at ~35% from the left, one status glyph + a log dot per column, tap opens that day's log sheet) sits directly beneath the ring, restoring in a new form the one-tap "log a day other than today" affordance the 2026-09-05 change removed. The three Home stat cards (`MiniStatCard` — cycle day / next period / ovulation) are deleted: cycle day is the ring eyebrow, next period is the hero, ovulation is on the ring and strip. Insights → Cycle overview stays the single place all values are listed together.
+**Reason:** UI/UX spec §3 ("Delete the three stat cards … a third redundant encoding") and §2.6 ("This is where dates live — it makes the ring's abstraction safe").
+**Reversible?** yes — `MiniStatCard.tsx` and the old `WeekStrip.tsx` are in git history.
+
+## 2026-09-06 — Late-period model unified; day-45 recalc card retired (A1)
+
+**Spec section:** REQUIREMENTS §5.7, UI/UX spec §2.5, §2.7 D–E
+**Decision:** Late-period state tiers on days past `nextPeriodStart`: 1..`predictionWindow` = "Expected around now" (ring normal); `predictionWindow`+1..7 = "No period logged yet" (marker parks at the day-1 boundary, dashed overflow arc grows daily; a once-only day-2 inline "Did your period start? [Yes, log it] [Not yet]" prompt); 8+ = "Predictions paused until you log your next period." (ring frozen); 60+ days since any logged flow = one re-anchor card "It's been a while. When did your last period start?". The former day-45 `RecalcCard` ("My cycle has changed — recalculate") is removed — the 8-day pause plus the 60-day re-anchor cover it. `lateState()` in `prediction.ts` gains the new tiers; no `Prediction` field changes.
+**Reason:** UI/UX spec §2.7 D–E is more specific and more careful than the single §5.7 "N days later than expected" line. User confirmed A1 on 2026-09-06.
+**Reversible?** yes — `lateState()` logic and copy keys only.
+
+## 2026-09-06 — Notifications section hidden until M7; app lock stays disabled
+
+**Spec section:** UI/UX spec §7, §13 sprint 1 items 5–6; REQUIREMENTS §7, §8
+**Decision:** The four notification toggles (which write settings but schedule nothing — no `services/notifications.ts` exists) are removed from the Settings screen entirely, along with the "Saved now; scheduled reminders arrive with a later update" caption. App lock stays a single disabled row. No new dependencies are added this pass — `expo-notifications`, `expo-secure-store`, and `expo-local-authentication` all stay absent. Local scheduling and the PIN remain M7 scope and are still required for §15 acceptance.
+**Reason:** UI/UX spec §7 offers "implement OR hide"; the fake toggles are called out there as "the worst pattern in the app — it silently trains distrust". User chose "hide both until a later pass" on 2026-09-06.
+**Reversible?** yes — the toggle rows are in git history; re-adding the dependencies is the real M7 task.
+
 ## 2026-09-06 — Seed / re-anchor writes rebuild `periods` once, not once per day
 
 **Spec section:** §4.4 / §4.5 step 6 (derived `periods` rebuild); CLAUDE.md rule 10 (never overwrite the user's own entries)
