@@ -4,6 +4,7 @@ import type { MonthGrid, MonthCell } from '../../core/calendar';
 import { formatDate } from '../../core/calendar';
 import { dayCellState } from '../../core/home';
 import { colors } from '../../theme/colors';
+import { useColors } from '../../theme/useColors';
 import { en } from '../../i18n/en';
 import { typography } from '../../theme/typography';
 import { MIN_TOUCH_TARGET, spacing } from '../../theme/spacing';
@@ -158,18 +159,18 @@ export function MonthGrid({
   );
 }
 
-// §12 rule 6 — labels come from `en`, not literals. Ovulation's swatch is the same solid
-// `ovulationFill` the day cell itself uses (§11.2), not a ring on the fertile wash. Static —
-// hoisted out of `LegendRow` so it isn't rebuilt every render.
-const LEGEND_ITEMS = [
-  { label: en.legendPeriod, color: colors.primary },
-  { label: en.legendPredicted, color: colors.primaryMuted },
-  { label: en.legendFertile, color: colors.fertileMuted },
-  { label: en.legendOvulation, color: colors.ovulationFill },
-  { label: en.legendLogged, color: colors.surface, dot: true },
-];
-
+// §12 rule 6 — labels come from `en`, not literals. Colour + a shape/dot, never colour alone
+// (§2.8). Built from `useColors()` so the colour-blind scheme reaches the swatches too.
+// Reworked to three entries in sub-step 1e.
 function LegendRow() {
+  const c = useColors();
+  const items = [
+    { label: en.legendPeriod, color: c.periodLogged },
+    { label: en.legendPredicted, color: c.periodPredicted },
+    { label: en.legendFertile, color: c.fertile },
+    { label: en.legendOvulation, color: c.ovulation },
+    { label: en.legendLogged, color: c.surface, dot: true },
+  ];
   return (
     <View
       style={{
@@ -180,7 +181,7 @@ function LegendRow() {
         paddingTop: spacing.sm,
       }}
     >
-      {LEGEND_ITEMS.map((it) => (
+      {items.map((it) => (
         <View key={it.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <View
             style={{
@@ -188,16 +189,14 @@ function LegendRow() {
               height: 10,
               borderRadius: 5,
               backgroundColor: it.color,
-              borderWidth: it.color === colors.surface ? 1 : 0,
-              borderColor: colors.border,
+              borderWidth: it.color === c.surface ? 1 : 0,
+              borderColor: c.border,
             }}
           />
           {it.dot ? (
-            <View
-              style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.textMuted }}
-            />
+            <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: c.textMuted }} />
           ) : null}
-          <Text style={{ ...typography.caption, color: colors.textMuted }}>{it.label}</Text>
+          <Text style={{ ...typography.caption, color: c.textMuted }}>{it.label}</Text>
         </View>
       ))}
     </View>

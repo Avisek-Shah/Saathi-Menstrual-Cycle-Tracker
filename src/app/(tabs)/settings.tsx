@@ -160,6 +160,12 @@ export default function SettingsScreen() {
             onChange={(v) => update({ quick_log_enabled: v })}
           />
           <Divider />
+          <ToggleRow
+            label={en.settingsColorBlind}
+            value={settings.color_blind_mode}
+            onChange={(v) => update({ color_blind_mode: v })}
+          />
+          <Divider />
           <DisabledRow label={en.settingsAppLock} />
         </Card>
       </View>

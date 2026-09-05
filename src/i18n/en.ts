@@ -60,6 +60,7 @@ export const en = {
   settingsAppSection: 'App',
   settingsAppLock: 'App lock',
   settingsQuickLog: 'Quick-log on Home',
+  settingsColorBlind: 'Colour-blind friendly',
   settingsDataSection: 'Data',
   settingsExportData: 'Export data',
   settingsDeleteAllData: 'Delete all data',

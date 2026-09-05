@@ -38,9 +38,9 @@ function colorForState(state: Exclude<DayCellState, 'loggedNoFlow' | 'none'>): s
     case 'predictedPeriod':
       return RING_PREDICTED_FILL;
     case 'fertile':
-      return colors.fertileMuted;
+      return colors.fertile;
     case 'ovulation':
-      return colors.ovulationFill;
+      return colors.ovulation;
   }
 }
 

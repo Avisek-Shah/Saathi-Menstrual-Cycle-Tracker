@@ -4,7 +4,9 @@
 // milestones that add UI.
 module.exports = {
   testEnvironment: 'node',
-  testMatch: ['<rootDir>/src/core/**/*.test.ts'],
+  // src/core/* plus the pure theme resolver (src/theme/palette.ts) — all dependency-free.
+  // UI / hook / repository tests (jest-expo, RN Testing Library) come with M12+.
+  testMatch: ['<rootDir>/src/core/**/*.test.ts', '<rootDir>/src/theme/**/*.test.ts'],
   transform: {
     '^.+\\.ts$': [
       'babel-jest',
