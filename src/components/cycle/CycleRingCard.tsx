@@ -42,7 +42,12 @@ export function CycleRingCard({ days, headline, dateLine, confidenceLabel }: Cyc
           {headline}
         </Text>
         <Text
-          style={{ ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.xs }}
+          style={{
+            ...typography.caption,
+            color: colors.textMuted,
+            textAlign: 'center',
+            marginTop: spacing.xs,
+          }}
           numberOfLines={2}
         >
           {dateLine}

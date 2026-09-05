@@ -7,10 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/app-icon-period-tracker.png",
     "userInterfaceStyle": "light",
-    "platforms": [
-      "android",
-      "ios"
-    ],
+    "platforms": ["android", "ios"],
     "plugins": [
       "expo-router",
       "expo-font",
@@ -30,10 +27,7 @@
     },
     "android": {
       "package": "com.yourname.saathi",
-      "versionCode": 1,
-      "permissions": [
-        "POST_NOTIFICATIONS"
-      ],
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/app-icon-period-tracker.png"

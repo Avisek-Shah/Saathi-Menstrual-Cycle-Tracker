@@ -7,7 +7,10 @@ import type { Period } from './periods';
 import type { Prediction } from './prediction';
 
 /** The most recent period start on or before `today`; falls back to `today`. */
-export function lastPeriodStartOnOrBefore(periods: Pick<Period, 'start_date'>[], today: string): string {
+export function lastPeriodStartOnOrBefore(
+  periods: Pick<Period, 'start_date'>[],
+  today: string,
+): string {
   return (
     periods
       .map((p) => p.start_date)
@@ -64,12 +67,7 @@ export function weekStripDays(today: string): string[] {
 }
 
 export type DayCellState =
-  | 'loggedPeriod'
-  | 'ovulation'
-  | 'fertile'
-  | 'predictedPeriod'
-  | 'loggedNoFlow'
-  | 'none';
+  'loggedPeriod' | 'ovulation' | 'fertile' | 'predictedPeriod' | 'loggedNoFlow' | 'none';
 
 /**
  * §11.2 day-cell state, highest precedence first. `today`-ring is layered by the component,
@@ -127,10 +125,15 @@ function ringDayState(
   return 'none';
 }
 
-/** §16 Home cycle ring — one full cycle of days, starting at `anchor`, for the hero chart. */
-export function cycleRingDays(args: {
-  anchor: string;
-  cycleLength: number;
+/**
+ * §16 Home ring — the current calendar month laid out as a ring (user request 2026-09-06,
+ * supersedes the last-period-anchored cycle ring). One slot per real day of the month in the
+ * active calendar system, so `dayNumber` is the day-of-month (1..32 in BS), not a cycle day.
+ * `cells` is `getMonthGrid(...).cells`; fill cells (previous/next month) are dropped here.
+ * Arc state per date reuses the same period / prediction ranges the cycle ring used.
+ */
+export function monthRingDays(args: {
+  cells: { iso: string; day: number; fill: boolean }[];
   today: string;
   periods: Pick<Period, 'start_date' | 'end_date'>[];
   prediction: Pick<
@@ -138,14 +141,13 @@ export function cycleRingDays(args: {
     'ovulationDate' | 'fertileStart' | 'fertileEnd' | 'nextPeriodStart' | 'nextPeriodEnd'
   >;
 }): RingDay[] {
-  const { anchor, cycleLength, today, periods, prediction } = args;
-  return Array.from({ length: cycleLength }, (_, i) => {
-    const dateIso = addDays(anchor, i);
-    return {
-      dateIso,
-      dayNumber: i + 1,
-      state: ringDayState(dateIso, periods, prediction),
-      isToday: dateIso === today,
-    };
-  });
+  const { cells, today, periods, prediction } = args;
+  return cells
+    .filter((c) => !c.fill)
+    .map((c) => ({
+      dateIso: c.iso,
+      dayNumber: c.day,
+      state: ringDayState(c.iso, periods, prediction),
+      isToday: c.iso === today,
+    }));
 }

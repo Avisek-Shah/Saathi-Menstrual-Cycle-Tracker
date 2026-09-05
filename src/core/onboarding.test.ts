@@ -89,7 +89,12 @@ describe('resolveOnboarding', () => {
 
   it('clamps out-of-range reported values', () => {
     const result = resolveOnboarding(
-      { lastPeriodStart: '2025-08-20', reportedCycleLength: 99, reportedPeriodLength: 0, birthYear: null },
+      {
+        lastPeriodStart: '2025-08-20',
+        reportedCycleLength: 99,
+        reportedPeriodLength: 0,
+        birthYear: null,
+      },
       '2025-08-31',
     );
     expect(result.settings.reported_cycle_length).toBe(45);

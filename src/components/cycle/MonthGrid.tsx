@@ -43,7 +43,14 @@ function chunkRows(cells: MonthCell[]): MonthCell[][] {
 }
 
 export function MonthGrid({
-  grid, today, periods, prediction, monthLogs, system, selected = null, onPressDay,
+  grid,
+  today,
+  periods,
+  prediction,
+  monthLogs,
+  system,
+  selected = null,
+  onPressDay,
 }: MonthGridProps) {
   // The columns lay themselves out with `flex: 1`, so they always divide the container into
   // exactly seven regardless of the padding `Screen` puts around us. Only the circle needs a
@@ -54,9 +61,10 @@ export function MonthGrid({
   // SPEC: 2026-09-04 — below ~308pt of usable width seven 44px targets cannot fit at all, so
   // the circle shrinks. Clipping the last column would be the worse failure. Before the first
   // layout pass there is nothing to measure; the §11.4 target is the right guess.
-  const cellSize = rowWidth > 0
-    ? Math.max(1, Math.min(MIN_TOUCH_TARGET, Math.floor(rowWidth / COLUMNS) - 2))
-    : MIN_TOUCH_TARGET;
+  const cellSize =
+    rowWidth > 0
+      ? Math.max(1, Math.min(MIN_TOUCH_TARGET, Math.floor(rowWidth / COLUMNS) - 2))
+      : MIN_TOUCH_TARGET;
 
   // One bound press handler per cell, rebuilt only when the grid itself or `onPressDay`
   // changes — not on every render. Without this, `<DayCell onPress={() => onPressDay(iso)}>`
@@ -163,11 +171,32 @@ const LEGEND_ITEMS = [
 
 function LegendRow() {
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingVertical: spacing.md, paddingTop: spacing.sm }}>
+    <View
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.sm,
+        paddingVertical: spacing.md,
+        paddingTop: spacing.sm,
+      }}
+    >
       {LEGEND_ITEMS.map((it) => (
         <View key={it.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: it.color, borderWidth: it.color === colors.surface ? 1 : 0, borderColor: colors.border }} />
-          {it.dot ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.textMuted }} /> : null}
+          <View
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 5,
+              backgroundColor: it.color,
+              borderWidth: it.color === colors.surface ? 1 : 0,
+              borderColor: colors.border,
+            }}
+          />
+          {it.dot ? (
+            <View
+              style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.textMuted }}
+            />
+          ) : null}
           <Text style={{ ...typography.caption, color: colors.textMuted }}>{it.label}</Text>
         </View>
       ))}

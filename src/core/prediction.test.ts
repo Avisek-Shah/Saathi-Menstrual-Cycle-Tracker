@@ -34,7 +34,12 @@ function periodsFromCycles(
     });
     start = addDays(start, cycleLength);
   }
-  periods.push({ start_date: start, cycle_length: null, length_days: periodLength, is_outlier: false });
+  periods.push({
+    start_date: start,
+    cycle_length: null,
+    length_days: periodLength,
+    is_outlier: false,
+  });
   return periods;
 }
 
@@ -70,7 +75,11 @@ describe('predict — weighted average + clamping (§5.2)', () => {
 
   it('clamps the 1-cycle blend', () => {
     // 0.5*45 + 0.5*99 = 72 -> clamp 45
-    const p = predict(periodsFromCycles([45]), { reported_cycle_length: 99, reported_period_length: 5 }, FUTURE);
+    const p = predict(
+      periodsFromCycles([45]),
+      { reported_cycle_length: 99, reported_period_length: 5 },
+      FUTURE,
+    );
     expect(p.avgCycleLength).toBe(45);
   });
 });
@@ -78,7 +87,13 @@ describe('predict — weighted average + clamping (§5.2)', () => {
 describe('predict — cold-start tiers (§5.4)', () => {
   it('0 cycles: uses reported values, low confidence', () => {
     const p = predict([], REPORTED, FUTURE);
-    expect(p).toMatchObject({ avgCycleLength: 28, avgPeriodLength: 5, confidence: 'low', cyclesUsed: 0, isIrregular: false });
+    expect(p).toMatchObject({
+      avgCycleLength: 28,
+      avgPeriodLength: 5,
+      confidence: 'low',
+      cyclesUsed: 0,
+      isIrregular: false,
+    });
   });
 
   it('1 cycle: 50/50 blend of observed and reported, low confidence', () => {
@@ -177,12 +192,21 @@ describe('lateState (§5.7)', () => {
   };
 
   it('before the predicted date: upcoming', () => {
-    expect(lateState({ ...base, today: '2025-06-05' })).toEqual({ status: 'upcoming', daysUntil: 5 });
+    expect(lateState({ ...base, today: '2025-06-05' })).toEqual({
+      status: 'upcoming',
+      daysUntil: 5,
+    });
   });
 
   it('day 1 past .. day = window: expected around now', () => {
-    expect(lateState({ ...base, today: '2025-06-11' })).toEqual({ status: 'expectedNow', daysPast: 1 });
-    expect(lateState({ ...base, today: '2025-06-13' })).toEqual({ status: 'expectedNow', daysPast: 3 });
+    expect(lateState({ ...base, today: '2025-06-11' })).toEqual({
+      status: 'expectedNow',
+      daysPast: 1,
+    });
+    expect(lateState({ ...base, today: '2025-06-13' })).toEqual({
+      status: 'expectedNow',
+      daysPast: 3,
+    });
   });
 
   it('day window + 1: late', () => {

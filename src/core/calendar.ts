@@ -15,13 +15,7 @@
  * (BS month name in BS mode, AD range as subtitle per §6.3).
  */
 import NepaliDate, { dateConfigMap } from 'nepali-date-converter';
-import {
-  addDays as fnsAddDays,
-  format,
-  getDaysInMonth,
-  getDay,
-  parseISO,
-} from 'date-fns';
+import { addDays as fnsAddDays, format, getDaysInMonth, getDay, parseISO } from 'date-fns';
 
 import { addDays, daysBetween, type IsoDate } from './dates';
 
@@ -109,7 +103,8 @@ export function formatDateRange(
   }
   const start = parseISO(startIso);
   const end = parseISO(endIso);
-  const sameMonth = start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth();
+  const sameMonth =
+    start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth();
   if (sameMonth) return `${format(start, 'd')}–${format(end, AD_FORMAT)}`;
   const sameYear = start.getFullYear() === end.getFullYear();
   if (sameYear) return `${format(start, 'd MMM')} – ${format(end, AD_FORMAT)}`;
@@ -225,8 +220,7 @@ function getMonthGridBs(bsYear: number, bsMonth1: number, today: IsoDate): Month
     throw new Error(`BS month out of range: ${bsMonth1}`);
   }
   const yearConfig = dateConfigMap[String(bsYear) as keyof typeof dateConfigMap] as
-    | Record<string, number>
-    | undefined;
+    Record<string, number> | undefined;
   if (!yearConfig) {
     // SPEC: 2026-08-31 — `dateConfigMap` covers 2000..2090 in the installed library. Refuse
     // gracefully for years outside the supported range rather than crashing later.
@@ -277,6 +271,16 @@ export function currentBsYear(today: IsoDate): number {
   return NepaliDate.fromAD(parseISO(today)).getBS().year;
 }
 
+/** The (year, month1) that contains `today` in the given system (§6.3). Month is 1-based. */
+export function currentMonthFor(
+  system: CalendarSystem,
+  today: IsoDate,
+): { year: number; month: number } {
+  if (system === 'BS') return { year: currentBsYear(today), month: currentBsMonth(today) };
+  const d = parseISO(today);
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
+
 /**
  * §6.3 — step by one month in the active system. Returns a new (year, month1) pair. Both AD
  * and BS have 12 months, so the modular arithmetic is identical. Negative deltas are allowed.
@@ -297,12 +301,13 @@ export function monthWindow(
   today: IsoDate,
   system: CalendarSystem,
 ): { start: { year: number; month: number }; end: { year: number; month: number } } {
-  const current = system === 'BS'
-    ? { year: currentBsYear(today), month: currentBsMonth(today) }
-    : (() => {
-        const d = parseISO(today);
-        return { year: d.getFullYear(), month: d.getMonth() + 1 };
-      })();
+  const current =
+    system === 'BS'
+      ? { year: currentBsYear(today), month: currentBsMonth(today) }
+      : (() => {
+          const d = parseISO(today);
+          return { year: d.getFullYear(), month: d.getMonth() + 1 };
+        })();
   const end = addMonth(current.year, current.month, 3); // cap
   // Clamp: never allow viewing beyond end.
   if (year > end.year || (year === end.year && month1 > end.month)) {

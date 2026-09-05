@@ -38,7 +38,9 @@ function NavRow({ label, value, onPress }: { label: string; value?: string; onPr
       }}
     >
       <Text style={{ ...typography.body, color: colors.text }}>{label}</Text>
-      {value ? <Text style={{ ...typography.caption, color: colors.textMuted }}>{value}</Text> : null}
+      {value ? (
+        <Text style={{ ...typography.caption, color: colors.textMuted }}>{value}</Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -84,7 +86,9 @@ function DisabledRow({ label }: { label: string }) {
       }}
     >
       <Text style={{ ...typography.body, color: colors.text }}>{label}</Text>
-      <Text style={{ ...typography.caption, color: colors.textMuted }}>{en.settingsNotBuiltYet}</Text>
+      <Text style={{ ...typography.caption, color: colors.textMuted }}>
+        {en.settingsNotBuiltYet}
+      </Text>
     </View>
   );
 }
@@ -103,10 +107,7 @@ export default function SettingsScreen() {
       <View>
         <SectionLabel label={en.settingsMyCycleSection} />
         <Card>
-          <NavRow
-            label={en.settingsMyCycleRow}
-            onPress={() => router.push('/settings/profile')}
-          />
+          <NavRow label={en.settingsMyCycleRow} onPress={() => router.push('/settings/profile')} />
           <Divider />
           <NavRow
             label={en.settingsCalendarSystem}

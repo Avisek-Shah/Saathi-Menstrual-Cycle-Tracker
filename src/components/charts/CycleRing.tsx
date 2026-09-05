@@ -20,15 +20,23 @@ interface CycleRingProps {
   children?: ReactNode;
 }
 
+// §11.2 mandates `primaryMuted` for the predicted-period *calendar cell*, where M10
+// darkened it to near-black (#050505ff) for grid legibility. On the ring — soft pastel arcs
+// on a pale track — near-black reads as an error next to the mint/pink arcs, and before the
+// ring became a full calendar month this arc was off-screen so nobody saw it. The ring keeps
+// the softer pre-M10 pink for this one state; every other fill is the shared token, and the
+// calendar is untouched. See DECISIONS.md 2026-09-06.
+const RING_PREDICTED_FILL = '#F9D4DC';
+
 // §11.2 — colour is never the only carrier of meaning; every filled state elsewhere in the
-// app (DayCell) also gets a distinct ring or dot. The ring reuses the exact same fills so a
-// user who already reads the calendar/week strip recognises the same states here.
+// app (DayCell) also gets a distinct ring or dot. The ring reuses the same fills so a user
+// who already reads the calendar/week strip recognises the same states here.
 function colorForState(state: Exclude<DayCellState, 'loggedNoFlow' | 'none'>): string {
   switch (state) {
     case 'loggedPeriod':
       return colors.primary;
     case 'predictedPeriod':
-      return colors.primaryMuted;
+      return RING_PREDICTED_FILL;
     case 'fertile':
       return colors.fertileMuted;
     case 'ovulation':
@@ -36,9 +44,10 @@ function colorForState(state: Exclude<DayCellState, 'loggedNoFlow' | 'none'>): s
   }
 }
 
-// Mirrors DayCell's `onSolid` rule: white text on the two solid fills, dark text on the pale
+// Mirrors DayCell's text-color rule: white text on the solid fills, dark text on the pale
 // washes and the empty track — never relies on colour alone since the number itself is the
-// second signal (§11.2).
+// second signal (§11.2). Predicted period is a pale wash on the ring (see RING_PREDICTED_FILL),
+// so its number is dark here, not the white DayCell uses on the darkened calendar fill.
 function textColorForState(state: DayCellState): string {
   if (state === 'loggedPeriod' || state === 'ovulation') return colors.surface;
   if (state === 'none') return colors.textMuted;
@@ -68,10 +77,11 @@ function toSegments(days: RingDay[]): Segment[] {
 }
 
 /**
- * §16 / BUILD_PLAN "SVG cycle-day ring" — one full cycle laid out as a ring: a coloured arc
- * per state (period / predicted / fertile / ovulation), each day numbered, plus a marker on
- * today's day. Not interactive — the calendar tab already covers logging; this is the
- * at-a-glance hero.
+ * §16 / BUILD_PLAN "SVG cycle-day ring" — one calendar month laid out as a ring (user
+ * request 2026-09-06; was one cycle from the last-period anchor): a coloured arc per state
+ * (period / predicted / fertile / ovulation), each day numbered by its day-of-month, plus a
+ * marker on today. `days` is `monthRingDays()` output. Not interactive — the calendar tab
+ * covers logging; this is the at-a-glance hero.
  */
 export function CycleRing({ days, size = 288, strokeWidth = 24, children }: CycleRingProps) {
   const radius = (size - strokeWidth) / 2;
@@ -86,8 +96,9 @@ export function CycleRing({ days, size = 288, strokeWidth = 24, children }: Cycl
     const angle = ((index + 0.5) / days.length) * 2 * Math.PI - Math.PI / 2;
     return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
   };
-  // The *seam* before day index `k` (as opposed to `pointFor`'s day-centre) — where one
-  // segment's dasharray actually starts/ends, so a rounded end-cap sits exactly on the join.
+  // A point on the ring band at day-index position `k` (fractional allowed) — `k` whole is
+  // the seam *before* day `k`, where a segment's dasharray starts/ends; a fractional `k` is
+  // used to place the pulled-in end-cap discs a fraction of a day inside that seam.
   const seamPoint = (k: number) => {
     const angle = (k / days.length) * 2 * Math.PI - Math.PI / 2;
     return { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
@@ -129,9 +140,35 @@ export function CycleRing({ days, size = 288, strokeWidth = 24, children }: Cycl
             fill="none"
           />
           {segments.flatMap((seg) => {
-            const arcLength = (circumference * seg.count) / days.length;
-            const offset = (circumference * seg.startIndex) / days.length;
+            // The ring is one calendar month, not a wrapping cycle: the last day of the
+            // month is not adjacent to the first, so both ends are open (treated as `none`),
+            // which gives a rounded cap at the 12 o'clock seam on each side.
+            const endIndex = seg.startIndex + seg.count;
+            const before: DayCellState =
+              seg.startIndex === 0 ? 'none' : days[seg.startIndex - 1].state;
+            const after: DayCellState = endIndex === days.length ? 'none' : days[endIndex].state;
             const color = colorForState(seg.state);
+
+            // A rounded arc end is a dome of radius strokeWidth/2. Drawn the obvious way —
+            // strokeLinecap="round", or a filled disc centred *on* the seam — that dome
+            // overshoots the seam by strokeWidth/2 and lands on top of the day number just
+            // outside the arc: at a 30-day cycle a `none` day's centre is only ~14px past
+            // the seam, less than the dome's 12px reach, so 30 / 8 / 11 / 19 (the numbers
+            // bordering the predicted-period and fertile arcs) got a coloured blob dumped on
+            // them. Fix: pull the butt-capped stroke *in* by strokeWidth/2 at every end that
+            // borders the empty track, then put the dome back with a disc whose outer edge
+            // stops exactly at the true seam — same rounded silhouette, nothing crossing
+            // into the neighbouring number. Ends that meet another colour keep their flush
+            // butt join, so the tight fertile → ovulation → fertile joins stay flat.
+            const capArc = strokeWidth / 2;
+            const arcPerDay = circumference / days.length;
+            const capDays = capArc / arcPerDay;
+            const startInset = before === 'none' ? capArc : 0;
+            const endInset = after === 'none' ? capArc : 0;
+            const rawArcLength = (circumference * seg.count) / days.length;
+            const arcLength = Math.max(0.1, rawArcLength - startInset - endInset);
+            const offset = (circumference * seg.startIndex) / days.length + startInset;
+
             const main = (
               <Circle
                 key={`${seg.state}-${seg.startIndex}`}
@@ -142,34 +179,36 @@ export function CycleRing({ days, size = 288, strokeWidth = 24, children }: Cycl
                 strokeWidth={strokeWidth}
                 strokeDasharray={`${arcLength} ${circumference - arcLength}`}
                 strokeDashoffset={-offset}
-                // A *true* round linecap rounds both ends of this dash equally — but where
-                // two colours sit back-to-back (fertile → ovulation → fertile, a day apart)
-                // that bulges each into the other and swallows the number between them. So
-                // the stroke itself always stays square-jointed…
                 strokeLinecap="butt"
                 fill="none"
                 rotation={-90}
                 origin={`${cx}, ${cy}`}
               />
             );
-            // …and a small filled disc — the same diameter as the band, so it reproduces a
-            // round cap exactly — is added by hand, but only at a seam that borders the empty
-            // track (`none`), never at a seam between two colours. That keeps the rounded
-            // look at every segment's *real* edge (period start, fertile tapering into empty
-            // days) while the tight internal joins that broke last time stay flat.
-            const before = days[(seg.startIndex - 1 + days.length) % days.length].state;
-            const after = days[(seg.startIndex + seg.count) % days.length].state;
+
             const caps = [];
             if (before === 'none') {
-              const p = seamPoint(seg.startIndex);
+              const p = seamPoint(seg.startIndex + capDays);
               caps.push(
-                <Circle key={`${seg.state}-${seg.startIndex}-cap-start`} cx={p.x} cy={p.y} r={strokeWidth / 2} fill={color} />,
+                <Circle
+                  key={`${seg.state}-${seg.startIndex}-cap-start`}
+                  cx={p.x}
+                  cy={p.y}
+                  r={capArc}
+                  fill={color}
+                />,
               );
             }
             if (after === 'none') {
-              const p = seamPoint(seg.startIndex + seg.count);
+              const p = seamPoint(seg.startIndex + seg.count - capDays);
               caps.push(
-                <Circle key={`${seg.state}-${seg.startIndex}-cap-end`} cx={p.x} cy={p.y} r={strokeWidth / 2} fill={color} />,
+                <Circle
+                  key={`${seg.state}-${seg.startIndex}-cap-end`}
+                  cx={p.x}
+                  cy={p.y}
+                  r={capArc}
+                  fill={color}
+                />,
               );
             }
             return [main, ...caps];

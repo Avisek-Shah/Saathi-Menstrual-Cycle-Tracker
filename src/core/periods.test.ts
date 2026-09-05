@@ -8,7 +8,11 @@ describe('recomputePeriods — run grouping by gap (§4.5 step 2)', () => {
   it('gap 0: a duplicate date collapses to one flow day', () => {
     const periods = recomputePeriods(bleed(['2025-03-01', '2025-03-01']));
     expect(periods).toHaveLength(1);
-    expect(periods[0]).toMatchObject({ start_date: '2025-03-01', end_date: '2025-03-01', length_days: 1 });
+    expect(periods[0]).toMatchObject({
+      start_date: '2025-03-01',
+      end_date: '2025-03-01',
+      length_days: 1,
+    });
   });
 
   it('gap 1 (consecutive days): one period', () => {
@@ -20,7 +24,11 @@ describe('recomputePeriods — run grouping by gap (§4.5 step 2)', () => {
   it('gap 2 (one empty day): stays one period', () => {
     const periods = recomputePeriods(bleed(['2025-03-01', '2025-03-03']));
     expect(periods).toHaveLength(1);
-    expect(periods[0]).toMatchObject({ start_date: '2025-03-01', end_date: '2025-03-03', length_days: 3 });
+    expect(periods[0]).toMatchObject({
+      start_date: '2025-03-01',
+      end_date: '2025-03-03',
+      length_days: 3,
+    });
   });
 
   it('gap 3 (two empty days): splits into two periods', () => {
@@ -35,7 +43,13 @@ describe('recomputePeriods — shape', () => {
   it('a single day of flow is a period of length 1 (§10.4)', () => {
     const periods = recomputePeriods(bleed(['2025-05-09']));
     expect(periods).toEqual([
-      { start_date: '2025-05-09', end_date: '2025-05-09', length_days: 1, cycle_length: null, is_outlier: false },
+      {
+        start_date: '2025-05-09',
+        end_date: '2025-05-09',
+        length_days: 1,
+        cycle_length: null,
+        is_outlier: false,
+      },
     ]);
   });
 
@@ -48,7 +62,11 @@ describe('recomputePeriods — shape', () => {
     ];
     const periods = recomputePeriods(logs);
     expect(periods).toHaveLength(1);
-    expect(periods[0]).toMatchObject({ start_date: '2025-06-01', end_date: '2025-06-03', length_days: 3 });
+    expect(periods[0]).toMatchObject({
+      start_date: '2025-06-01',
+      end_date: '2025-06-03',
+      length_days: 3,
+    });
   });
 
   it('covers a period at the very start and very end of the dataset', () => {
@@ -64,8 +82,7 @@ describe('recomputePeriods — shape', () => {
 });
 
 describe('recomputePeriods — outlier flagging on cycle length (§4.5 step 5)', () => {
-  const twoPeriods = (secondStart: string) =>
-    recomputePeriods(bleed(['2025-01-01', secondStart]));
+  const twoPeriods = (secondStart: string) => recomputePeriods(bleed(['2025-01-01', secondStart]));
 
   it('20 days is an outlier (below 21)', () => {
     expect(twoPeriods('2025-01-21')[0]).toMatchObject({ cycle_length: 20, is_outlier: true });
@@ -83,9 +100,7 @@ describe('recomputePeriods — outlier flagging on cycle length (§4.5 step 5)',
 
 describe('recomputePeriods — outlier flagging on period length (§4.5 step 4)', () => {
   it('a run longer than 10 days is stored but marked outlier', () => {
-    const dates = Array.from({ length: 11 }, (_, i) =>
-      `2025-04-${String(i + 1).padStart(2, '0')}`,
-    );
+    const dates = Array.from({ length: 11 }, (_, i) => `2025-04-${String(i + 1).padStart(2, '0')}`);
     const periods = recomputePeriods(bleed(dates));
     expect(periods[0]).toMatchObject({ length_days: 11, is_outlier: true });
   });

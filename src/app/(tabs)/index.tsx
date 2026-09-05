@@ -2,18 +2,23 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState, View } from 'react-native';
 
-import { formatDate, formatDateRange } from '../../core/calendar';
+import { currentMonthFor, formatDate, formatDateRange, getMonthGrid } from '../../core/calendar';
 import type { Symptom } from '../../core/enums';
 import {
   cycleDay,
-  cycleRingDays,
   currentPeriod,
   lastPeriodStartOnOrBefore,
+  monthRingDays,
   predictionDateRange,
   primaryAction,
 } from '../../core/home';
 import { lateState } from '../../core/prediction';
-import { applyQuickToggle, quickLogOptions, rankRecentSymptoms, type LogSnapshot } from '../../core/quickLog';
+import {
+  applyQuickToggle,
+  quickLogOptions,
+  rankRecentSymptoms,
+  type LogSnapshot,
+} from '../../core/quickLog';
 import { IrregularNoticeCard } from '../../components/cycle/IrregularNoticeCard';
 import { CycleRingCard } from '../../components/cycle/CycleRingCard';
 import { FertileCard } from '../../components/cycle/FertileCard';
@@ -68,14 +73,6 @@ export default function Home() {
     return () => sub.remove();
   }, [refresh]);
 
-  // §5.6 — reset the notice flag when cycles stop being irregular, so a later re-detection shows it again.
-  useEffect(() => {
-    if (!prediction) return;
-    if (!prediction.isIrregular && settings.irregular_notice_seen) {
-      void updateSettings({ irregular_notice_seen: false });
-    }
-  }, [prediction, settings.irregular_notice_seen, updateSettings]);
-
   // §6.2 quick-log row — most-used recent symptoms, refreshed whenever Home regains focus.
   useFocusEffect(
     useCallback(() => {
@@ -93,9 +90,11 @@ export default function Home() {
   // lives inside the memo rather than being handled by that return.
   const ringDays = useMemo(() => {
     if (!prediction) return [];
-    const anchorForRing = lastPeriodStartOnOrBefore(periods, today);
-    return cycleRingDays({ anchor: anchorForRing, cycleLength: prediction.avgCycleLength, today, periods, prediction });
-  }, [prediction, periods, today]);
+    const system = settings.calendar_system ?? 'AD';
+    const { year, month } = currentMonthFor(system, today);
+    const grid = getMonthGrid(year, month, system, today);
+    return monthRingDays({ cells: grid.cells, today, periods, prediction });
+  }, [prediction, periods, today, settings.calendar_system]);
 
   if (!ready || !prediction) {
     return <Screen />;
@@ -115,7 +114,8 @@ export default function Home() {
     if (onPeriod) {
       return fill(en.onPeriod, { day: cycleDay(onPeriod.start_date, today) });
     }
-    if (late.status === 'expectedNow' || late.status === 'offerRecalculate') return en.expectedAroundNow;
+    if (late.status === 'expectedNow' || late.status === 'offerRecalculate')
+      return en.expectedAroundNow;
     if (late.status === 'late') return fill(en.lateBy, { days: late.daysPast });
     const daysUntil = late.status === 'upcoming' ? late.daysUntil : 0;
     return daysUntil === 1 ? en.periodInOne : fill(en.periodIn, { days: daysUntil });
@@ -178,7 +178,9 @@ export default function Home() {
   return (
     <Screen bottomInset gap={16}>
       {showIrregularNotice ? (
-        <IrregularNoticeCard onDismiss={() => void updateSettings({ irregular_notice_seen: true })} />
+        <IrregularNoticeCard
+          onDismiss={() => void updateSettings({ irregular_notice_seen: true })}
+        />
       ) : null}
       {showRecalc ? (
         <RecalcCard
@@ -198,10 +200,7 @@ export default function Home() {
       />
 
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-        <MiniStatCard
-          label={en.overviewCycleDayLabel}
-          value={String(cycleDay(anchor, today))}
-        />
+        <MiniStatCard label={en.overviewCycleDayLabel} value={String(cycleDay(anchor, today))} />
         <MiniStatCard label={en.overviewNextPeriod} value={nextPeriodValue} />
         <MiniStatCard label={en.overviewOvulation} value={ovulationValue} />
       </View>
@@ -215,7 +214,11 @@ export default function Home() {
         <QuickLog options={quickOptions} onToggle={onQuickToggle} />
       ) : null}
 
-      <FertileCard prediction={prediction} calendarSystem={settings.calendar_system} today={today} />
+      <FertileCard
+        prediction={prediction}
+        calendarSystem={settings.calendar_system}
+        today={today}
+      />
 
       <LogSummary log={todayLog} onEdit={() => router.push(`/log/${today}`)} />
     </Screen>

@@ -1,11 +1,12 @@
 import { describe, expect, it } from '@jest/globals';
 
+import { getMonthGrid } from './calendar';
 import {
   cycleDay,
-  cycleRingDays,
   currentPeriod,
   dayCellState,
   lastPeriodStartOnOrBefore,
+  monthRingDays,
   predictionDateRange,
   primaryAction,
   weekStripDays,
@@ -94,33 +95,69 @@ describe('dayCellState (§11.2 precedence)', () => {
 
   it('logged flow inside a period wins', () => {
     expect(
-      dayCellState({ dateIso: '2025-06-03', loggedFlow: 'medium', hasLogRow: true, periods, prediction }),
+      dayCellState({
+        dateIso: '2025-06-03',
+        loggedFlow: 'medium',
+        hasLogRow: true,
+        periods,
+        prediction,
+      }),
     ).toBe('loggedPeriod');
   });
   it('ovulation before fertile before predicted', () => {
     expect(
-      dayCellState({ dateIso: '2025-07-01', loggedFlow: null, hasLogRow: false, periods, prediction }),
+      dayCellState({
+        dateIso: '2025-07-01',
+        loggedFlow: null,
+        hasLogRow: false,
+        periods,
+        prediction,
+      }),
     ).toBe('ovulation');
     expect(
-      dayCellState({ dateIso: '2025-06-27', loggedFlow: null, hasLogRow: false, periods, prediction }),
+      dayCellState({
+        dateIso: '2025-06-27',
+        loggedFlow: null,
+        hasLogRow: false,
+        periods,
+        prediction,
+      }),
     ).toBe('fertile');
     expect(
-      dayCellState({ dateIso: '2025-07-16', loggedFlow: null, hasLogRow: false, periods, prediction }),
+      dayCellState({
+        dateIso: '2025-07-16',
+        loggedFlow: null,
+        hasLogRow: false,
+        periods,
+        prediction,
+      }),
     ).toBe('predictedPeriod');
   });
   it('a log row with no flow is the faint dot state', () => {
     expect(
-      dayCellState({ dateIso: '2025-06-20', loggedFlow: 'none', hasLogRow: true, periods, prediction }),
+      dayCellState({
+        dateIso: '2025-06-20',
+        loggedFlow: 'none',
+        hasLogRow: true,
+        periods,
+        prediction,
+      }),
     ).toBe('loggedNoFlow');
   });
   it('nothing otherwise', () => {
     expect(
-      dayCellState({ dateIso: '2025-06-20', loggedFlow: null, hasLogRow: false, periods, prediction }),
+      dayCellState({
+        dateIso: '2025-06-20',
+        loggedFlow: null,
+        hasLogRow: false,
+        periods,
+        prediction,
+      }),
     ).toBe('none');
   });
 });
 
-describe('cycleRingDays', () => {
+describe('monthRingDays', () => {
   const prediction = {
     ovulationDate: '2025-06-15',
     fertileStart: '2025-06-10',
@@ -129,44 +166,66 @@ describe('cycleRingDays', () => {
     nextPeriodEnd: '2025-07-02',
   };
   const periods = [period('2025-06-01', '2025-06-05')];
+  // June 2025 (AD): 30 real days, starts Sunday → no leading fill.
+  const juneCells = getMonthGrid(2025, 6, 'AD', '2025-06-03').cells;
 
-  it('numbers days 1..cycleLength from anchor and flags today', () => {
-    const days = cycleRingDays({
-      anchor: '2025-06-01',
-      cycleLength: 28,
-      today: '2025-06-03',
-      periods,
-      prediction,
+  it('emits one slot per real day of the month, numbered by day-of-month, today flagged once', () => {
+    const days = monthRingDays({ cells: juneCells, today: '2025-06-03', periods, prediction });
+    expect(days).toHaveLength(30);
+    expect(days[0]).toEqual({
+      dateIso: '2025-06-01',
+      dayNumber: 1,
+      state: 'loggedPeriod',
+      isToday: false,
     });
-    expect(days).toHaveLength(28);
-    expect(days[0]).toEqual({ dateIso: '2025-06-01', dayNumber: 1, state: 'loggedPeriod', isToday: false });
-    expect(days[2]).toEqual({ dateIso: '2025-06-03', dayNumber: 3, state: 'loggedPeriod', isToday: true });
+    expect(days[2]).toEqual({
+      dateIso: '2025-06-03',
+      dayNumber: 3,
+      state: 'loggedPeriod',
+      isToday: true,
+    });
+    expect(days.at(-1)?.dayNumber).toBe(30);
     expect(days.filter((d) => d.isToday)).toHaveLength(1);
   });
 
-  it('marks a day inside the logged period as loggedPeriod without needing a flow log', () => {
-    const days = cycleRingDays({
-      anchor: '2025-06-01',
-      cycleLength: 28,
-      today: '2025-06-01',
+  it('drops previous/next-month fill cells', () => {
+    // July 2025 starts Tuesday → 2 leading fill cells (Jun 29–30) that must not appear.
+    const days = monthRingDays({
+      cells: getMonthGrid(2025, 7, 'AD', '2025-07-01').cells,
+      today: '2025-07-01',
       periods,
       prediction,
     });
+    expect(days).toHaveLength(31);
+    expect(days[0].dateIso).toBe('2025-07-01');
+    expect(days.every((d) => d.dateIso.startsWith('2025-07-'))).toBe(true);
+  });
+
+  it('marks a day inside the logged period as loggedPeriod without needing a flow log', () => {
+    const days = monthRingDays({ cells: juneCells, today: '2025-06-01', periods, prediction });
     expect(days[3].state).toBe('loggedPeriod'); // 2025-06-04, inside the period, no log passed
   });
 
   it('otherwise follows ovulation > fertile > predicted precedence', () => {
-    const days = cycleRingDays({
-      anchor: '2025-06-01',
-      cycleLength: 32,
-      today: '2025-06-01',
-      periods,
-      prediction,
-    });
+    const days = monthRingDays({ cells: juneCells, today: '2025-06-01', periods, prediction });
     const byIso = Object.fromEntries(days.map((d) => [d.dateIso, d.state]));
     expect(byIso['2025-06-15']).toBe('ovulation');
     expect(byIso['2025-06-11']).toBe('fertile');
-    expect(byIso['2025-06-30']).toBe('predictedPeriod');
+    expect(byIso['2025-06-29']).toBe('predictedPeriod');
     expect(byIso['2025-06-20']).toBe('none');
+  });
+
+  it('BS month: day count is the BS month length, numbered in BS day-of-month', () => {
+    // Ashadh 2082 is a 32-day BS month (dateConfigMap) — the case behind "make the ring 32".
+    const days = monthRingDays({
+      cells: getMonthGrid(2082, 3, 'BS', '2025-06-20').cells,
+      today: '2025-06-20',
+      periods,
+      prediction,
+    });
+    expect(days).toHaveLength(32);
+    expect(days[0].dayNumber).toBe(1);
+    expect(days.at(-1)?.dayNumber).toBe(32);
+    expect(days.every((d) => d.dayNumber >= 1 && d.dayNumber <= 32)).toBe(true);
   });
 });

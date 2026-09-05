@@ -19,7 +19,12 @@ const BUTTON_SIZE = 40;
  * shadow, not a bare glyph floating on the background. Used by the calendar tab and the
  * onboarding/profile date picker so month navigation looks the same everywhere.
  */
-export function MonthNavButton({ glyph, accessibilityLabel, onPress, disabled = false }: MonthNavButtonProps) {
+export function MonthNavButton({
+  glyph,
+  accessibilityLabel,
+  onPress,
+  disabled = false,
+}: MonthNavButtonProps) {
   return (
     <Pressable
       accessibilityRole="button"
@@ -41,7 +46,13 @@ export function MonthNavButton({ glyph, accessibilityLabel, onPress, disabled = 
         ...elevation.card,
       })}
     >
-      <Text style={{ ...typography.title, color: colors.primary, lineHeight: typography.title.fontSize }}>
+      <Text
+        style={{
+          ...typography.title,
+          color: colors.primary,
+          lineHeight: typography.title.fontSize,
+        }}
+      >
         {glyph}
       </Text>
     </Pressable>

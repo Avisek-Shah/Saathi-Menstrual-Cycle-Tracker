@@ -42,6 +42,8 @@ yarn-error.*
 
 #ai
 .mcp.json
+.agent
 .agents
+.remove
 
 

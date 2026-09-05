@@ -1,6 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { applyQuickToggle, quickLogOptions, rankRecentSymptoms, type LogSnapshot } from './quickLog';
+import {
+  applyQuickToggle,
+  quickLogOptions,
+  rankRecentSymptoms,
+  type LogSnapshot,
+} from './quickLog';
 
 const empty: LogSnapshot = { flow: 'none', moods: [], symptoms: [], note: null };
 
@@ -85,7 +90,11 @@ describe('applyQuickToggle (§6.2 merge semantics)', () => {
   });
 
   it('starts from an empty log when nothing was logged yet', () => {
-    const result = applyQuickToggle(null, { kind: 'symptom', symptom: 'headache', selected: false });
+    const result = applyQuickToggle(null, {
+      kind: 'symptom',
+      symptom: 'headache',
+      selected: false,
+    });
     expect(result).toEqual({ flow: 'none', moods: [], symptoms: ['headache'], note: null });
   });
 });

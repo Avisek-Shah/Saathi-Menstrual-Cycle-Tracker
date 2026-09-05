@@ -197,9 +197,6 @@ export async function getRecent(limit: number, before?: string): Promise<LogRow[
         before,
         limit,
       )
-    : await db.getAllAsync<RawLogRow>(
-        'SELECT * FROM daily_logs ORDER BY date DESC LIMIT ?',
-        limit,
-      );
+    : await db.getAllAsync<RawLogRow>('SELECT * FROM daily_logs ORDER BY date DESC LIMIT ?', limit);
   return rows.map(toLogRow);
 }

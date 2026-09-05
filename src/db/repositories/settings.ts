@@ -136,10 +136,7 @@ export async function getSettings(): Promise<Settings> {
   return result;
 }
 
-export async function setSetting<K extends SettingKey>(
-  key: K,
-  value: Settings[K],
-): Promise<void> {
+export async function setSetting<K extends SettingKey>(key: K, value: Settings[K]): Promise<void> {
   const db = await openDB();
   await db.runAsync(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',

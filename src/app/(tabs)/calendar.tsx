@@ -4,7 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
-import { addMonth, currentBsMonth, currentBsYear, getMonthGrid, type CalendarSystem } from '../../core/calendar';
+import { addMonth, currentMonthFor, getMonthGrid } from '../../core/calendar';
 import { DaySheet } from '../../components/cycle/DaySheet';
 import { MonthGrid } from '../../components/cycle/MonthGrid';
 import { MonthNavButton } from '../../components/ui/MonthNavButton';
@@ -40,13 +40,6 @@ const EMPTY_PREDICTION: Prediction = {
   cyclesUsed: 0,
 };
 
-/** The (year, month) containing `iso`, in the given calendar system (§6.3). */
-function currentMonthFor(system: CalendarSystem, today: string): { year: number; month: number } {
-  if (system === 'BS') return { year: currentBsYear(today), month: currentBsMonth(today) };
-  const d = new Date(today + 'T12:00:00');
-  return { year: d.getFullYear(), month: d.getMonth() + 1 };
-}
-
 export default function CalendarScreen() {
   const router = useRouter();
   const settings = useSettingsStore((s) => s.settings);
@@ -70,6 +63,7 @@ export default function CalendarScreen() {
   // `current`) — the cursor must NOT jump back to the current month on a midnight rollover
   // while the user has navigated elsewhere.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCursor(current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [system]);
@@ -80,7 +74,11 @@ export default function CalendarScreen() {
     void refresh(fresh);
   }, [refresh]);
 
-  useFocusEffect(useCallback(() => { refreshToday(); }, [refreshToday]));
+  useFocusEffect(
+    useCallback(() => {
+      refreshToday();
+    }, [refreshToday]),
+  );
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
@@ -101,7 +99,8 @@ export default function CalendarScreen() {
         // (rapid double-tap, or a swipe landing right after a button press) both closed over
         // the same `canNext`, so the guard passed twice and the cursor skipped one month past
         // `end`.
-        const overshoots = next.year > end.year || (next.year === end.year && next.month > end.month);
+        const overshoots =
+          next.year > end.year || (next.year === end.year && next.month > end.month);
         if (delta > 0 && overshoots) return c;
         return next;
       });
@@ -109,7 +108,10 @@ export default function CalendarScreen() {
     [end],
   );
 
-  const grid = useMemo(() => getMonthGrid(cursor.year, cursor.month, system, today), [cursor, system, today]);
+  const grid = useMemo(
+    () => getMonthGrid(cursor.year, cursor.month, system, today),
+    [cursor, system, today],
+  );
   const rangeStart = grid.cells[0].iso;
   const rangeEnd = grid.cells[grid.cells.length - 1].iso;
 
@@ -140,7 +142,9 @@ export default function CalendarScreen() {
     void fetchMonthLogs(rangeStart, rangeEnd).then((map) => {
       if (!cancelled) setLogs(map);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
     // reloadToken only forces a refetch on focus; it carries no data of its own.
   }, [fetchMonthLogs, rangeStart, rangeEnd, reloadToken]);
 
@@ -234,7 +238,7 @@ export default function CalendarScreen() {
         system={system}
         periods={periods}
         prediction={p}
-        log={selected ? logs[selected] ?? null : null}
+        log={selected ? (logs[selected] ?? null) : null}
         onSelectFlow={(flow) => void handleSelectFlow(flow)}
         onEditFull={() => {
           if (selected) router.push(`/log/${selected}`);

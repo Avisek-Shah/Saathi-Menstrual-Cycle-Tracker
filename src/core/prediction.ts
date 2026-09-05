@@ -80,8 +80,7 @@ export function weightedAverage(valuesNewestFirst: number[]): number {
 export function standardDeviation(values: number[]): number {
   if (values.length === 0) return 0;
   const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  const variance =
-    values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length;
+  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length;
   return Math.sqrt(variance);
 }
 
@@ -153,9 +152,7 @@ export function predict(
     avgPeriodLength = clampRound(observedPeriod, PERIOD_MIN, PERIOD_MAX);
   }
 
-  const lastThreeOutlier = completed
-    .slice(-3)
-    .some((p) => isCycleOutlier(p.cycle_length));
+  const lastThreeOutlier = completed.slice(-3).some((p) => isCycleOutlier(p.cycle_length));
   const irregular = isIrregular(nonOutlierCyclesNewestFirst, lastThreeOutlier);
 
   // §5.4 confidence.
@@ -169,11 +166,12 @@ export function predict(
   if (irregular) predictionWindow = Math.min(7, predictionWindow + 2);
 
   // Anchor on the most recent period start on or before today (§5.4 / §5.7).
-  const anchorStart = periods
-    .map((p) => p.start_date)
-    .filter((d) => d <= today)
-    .sort()
-    .pop() ?? today;
+  const anchorStart =
+    periods
+      .map((p) => p.start_date)
+      .filter((d) => d <= today)
+      .sort()
+      .pop() ?? today;
 
   const nextPeriodStart = addDays(anchorStart, avgCycleLength);
   const nextPeriodEnd = addDays(nextPeriodStart, avgPeriodLength - 1);
@@ -210,13 +208,8 @@ export function lateState(args: {
   /** True once the user has logged any flow on or after `nextPeriodStart` (§5.7 precondition). */
   flowLoggedSinceNextStart: boolean;
 }): LateState {
-  const {
-    nextPeriodStart,
-    predictionWindow,
-    lastPeriodStart,
-    today,
-    flowLoggedSinceNextStart,
-  } = args;
+  const { nextPeriodStart, predictionWindow, lastPeriodStart, today, flowLoggedSinceNextStart } =
+    args;
 
   const daysUntil = daysBetween(today, nextPeriodStart);
   if (daysUntil > 0) return { status: 'upcoming', daysUntil };

@@ -36,10 +36,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   completeOnboarding: async (input, today) => {
     const { settings, seedLogs } = resolveOnboarding(input, today);
-    // upsert also re-runs recomputePeriods() (§4.4).
-    for (const log of seedLogs) {
-      await dailyLogs.upsert(log.date, log.flow, [], [], null);
-    }
+    // One transaction, one recomputePeriods() (§4.4) — not one per seeded day. The seed is a
+    // contiguous block of `flow = 'medium'` days with nothing else on them.
+    await dailyLogs.upsertMany(
+      seedLogs.map((log) => ({ date: log.date, flow: log.flow, moods: [], symptoms: [] })),
+    );
     const onboarding_seed_range =
       seedLogs.length > 0
         ? { start: seedLogs[0].date, end: seedLogs[seedLogs.length - 1].date }
@@ -67,20 +68,33 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
     const plan = reseedPlan(oldRange, newStart, settings.reported_period_length, protectedDates);
 
+    // A seed day may already carry mood/symptom/note the user entered — e.g. the new range
+    // overlaps a day she logged for an unrelated reason. Only flow is ever set here; her other
+    // fields are preserved, never overwritten with empty values (CLAUDE.md rule 10). The seed
+    // dates are contiguous (`newStart …`), so one range read covers them; `plan.clear` and
+    // `plan.seed` are disjoint (reseedPlan), so reading before the clear is safe.
+    const existingBySeedDate = new Map(
+      plan.seed.length > 0
+        ? (await dailyLogs.getRange(plan.seed[0].date, plan.seed[plan.seed.length - 1].date)).map(
+            (row) => [row.date, row] as const,
+          )
+        : [],
+    );
+    const seedEntries = plan.seed.map((log) => {
+      const existing = existingBySeedDate.get(log.date);
+      return {
+        date: log.date,
+        flow: log.flow,
+        moods: existing?.moods ?? [],
+        symptoms: existing?.symptoms ?? [],
+        note: existing?.note ?? null,
+      };
+    });
+
+    // Two units, each atomic and each rebuilding `periods` once (§4.5 step 6) — was one
+    // rebuild for the clear plus one per seeded day.
     await dailyLogs.clearFlowForDates(plan.clear);
-    for (const log of plan.seed) {
-      // A seed day may already carry mood/symptom/note the user entered — e.g. the new range
-      // overlaps a day she logged for an unrelated reason. Only flow is ever set here; her
-      // other fields are preserved, never overwritten with empty values (CLAUDE.md rule 10).
-      const existing = await dailyLogs.getByDate(log.date);
-      await dailyLogs.upsert(
-        log.date,
-        log.flow,
-        existing?.moods ?? [],
-        existing?.symptoms ?? [],
-        existing?.note ?? null,
-      );
-    }
+    await dailyLogs.upsertMany(seedEntries);
 
     const patch = { onboarding_seed_range: plan.range };
     await setSettings(patch);

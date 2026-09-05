@@ -53,8 +53,7 @@ export function recomputePeriods(logs: FlowLog[]): Period[] {
     const length_days = daysBetween(run.start, run.end) + 1;
     const cycle_length = next ? daysBetween(run.start, next.start) : null;
     const cycleOutlier =
-      cycle_length !== null &&
-      (cycle_length < VALID_CYCLE_MIN || cycle_length > VALID_CYCLE_MAX);
+      cycle_length !== null && (cycle_length < VALID_CYCLE_MIN || cycle_length > VALID_CYCLE_MAX);
     const periodOutlier = length_days > VALID_PERIOD_MAX;
     return {
       start_date: run.start,

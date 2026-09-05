@@ -51,7 +51,9 @@ export default function RootLayout() {
         <StatusBar style="dark" />
         {/* Hold the first frame until we know whether onboarding is needed (§6.1, avoids a flash). */}
         {hydrated ? (
-          <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+          <Stack
+            screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}
+          >
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="onboarding/index" />
             <Stack.Screen name="log/[date]" options={{ presentation: 'modal' }} />

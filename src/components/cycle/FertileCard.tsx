@@ -17,8 +17,10 @@ interface FertileCardProps {
 }
 
 function relativeLine(fertileStart: string, fertileEnd: string, today: string): string {
-  if (today < fertileStart) return fill(en.fertileInDays, { days: daysBetween(today, fertileStart) });
-  if (today > fertileEnd) return fill(en.fertileStartedDaysAgo, { days: daysBetween(fertileStart, today) });
+  if (today < fertileStart)
+    return fill(en.fertileInDays, { days: daysBetween(today, fertileStart) });
+  if (today > fertileEnd)
+    return fill(en.fertileStartedDaysAgo, { days: daysBetween(fertileStart, today) });
   return en.fertileToday;
 }
 

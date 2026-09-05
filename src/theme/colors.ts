@@ -7,6 +7,7 @@ export const colors = {
   surface: '#FFFFFF',
   primary: '#E8637C',
   primaryMuted: '#050505ff', // was #F9D4DC — darkened for calendar legibility (§11.2)
+  onPrimaryMuted: '#FFFFFF', // White text on dark primaryMuted (WCAG AA 21:1)
   fertile: '#7FB3A8',
   fertileMuted: '#9FD0C2', // was #D6E9E4 — darkened for calendar legibility (§11.2)
   ovulation: '#4E8D80',

@@ -59,7 +59,11 @@ export default function InsightsScreen() {
   const [today, setToday] = useState(() => todayIso());
   const refreshToday = useCallback(() => setToday(todayIso()), []);
 
-  useFocusEffect(useCallback(() => { refreshToday(); }, [refreshToday]));
+  useFocusEffect(
+    useCallback(() => {
+      refreshToday();
+    }, [refreshToday]),
+  );
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
@@ -122,7 +126,9 @@ export default function InsightsScreen() {
     return (
       <Screen title={en.insights} bottomInset>
         <Card>
-          <Text style={{ ...typography.body, color: colors.textMuted }}>{en.insightsEmptyStats}</Text>
+          <Text style={{ ...typography.body, color: colors.textMuted }}>
+            {en.insightsEmptyStats}
+          </Text>
         </Card>
         {journalSection}
       </Screen>
@@ -138,17 +144,27 @@ export default function InsightsScreen() {
 
       {!hasEnough ? (
         <Card>
-          <Text style={{ ...typography.body, color: colors.textMuted }}>{en.insightsEmptyStats}</Text>
+          <Text style={{ ...typography.body, color: colors.textMuted }}>
+            {en.insightsEmptyStats}
+          </Text>
         </Card>
       ) : (
         <>
-          <StatRow label={en.insightsAvgCycle} value={fill(en.insightsDays, { n: String(avgCycleLength) })} />
-          <StatRow label={en.insightsAvgPeriod} value={fill(en.insightsDays, { n: String(avgPeriodLength) })} />
+          <StatRow
+            label={en.insightsAvgCycle}
+            value={fill(en.insightsDays, { n: String(avgCycleLength) })}
+          />
+          <StatRow
+            label={en.insightsAvgPeriod}
+            value={fill(en.insightsDays, { n: String(avgPeriodLength) })}
+          />
           <Text style={{ ...typography.caption, color: colors.textMuted }}>
             {fill(en.insightsCyclesUsed, { n: String(cyclesUsed) })}
           </Text>
           {confidence === 'low' ? (
-            <Text style={{ ...typography.caption, color: colors.textMuted }}>{en.confidenceEstimate}</Text>
+            <Text style={{ ...typography.caption, color: colors.textMuted }}>
+              {en.confidenceEstimate}
+            </Text>
           ) : null}
         </>
       )}

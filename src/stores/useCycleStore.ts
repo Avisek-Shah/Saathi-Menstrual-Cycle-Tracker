@@ -34,11 +34,17 @@ export const useCycleStore = create<CycleState>((set, get) => ({
   ready: false,
 
   refresh: async (today) => {
-    const { settings } = useSettingsStore.getState();
+    const { settings, update } = useSettingsStore.getState();
     const [periods, todayLog] = await Promise.all([getAllPeriods(), dailyLogs.getByDate(today)]);
+    const prediction = predict(periods, settings, today);
+
+    if (!prediction.isIrregular && settings.irregular_notice_seen) {
+      void update({ irregular_notice_seen: false });
+    }
+
     set({
       periods,
-      prediction: predict(periods, settings, today),
+      prediction,
       todayLog: todayLog ?? null,
       ready: true,
     });

@@ -51,9 +51,14 @@ export const DayCell = memo(function DayCell({
   const inner = size - 4;
   const d = parseISO(dateIso);
   const fill = fillFor(state);
-  // Solid-filled states get white text — a filled circle reads as "this happened / is
-  // estimated firmly", vs. the pale wash used for a merely predicted or fertile day.
-  const onSolid = state === 'loggedPeriod' || state === 'ovulation';
+  // Solid-filled and darkened-muted states get light text — white on primary/ovulationFill/primaryMuted,
+  // dark text on the pale wash (fertile) and empty cells.
+  const textColor =
+    state === 'loggedPeriod' || state === 'ovulation'
+      ? colors.surface
+      : state === 'predictedPeriod'
+        ? colors.onPrimaryMuted
+        : colors.text;
 
   return (
     <Pressable
@@ -95,9 +100,7 @@ export const DayCell = memo(function DayCell({
             borderColor: colors.text,
           }}
         >
-          <Text style={{ ...typography.body, color: onSolid ? colors.surface : colors.text }}>
-            {label ?? d.getDate()}
-          </Text>
+          <Text style={{ ...typography.body, color: textColor }}>{label ?? d.getDate()}</Text>
         </View>
       </View>
       <View

@@ -10,5 +10,6 @@
       },
       "channel": "preview"
     }
-  }
+  },
+  "appVersionSource": "local"
 }

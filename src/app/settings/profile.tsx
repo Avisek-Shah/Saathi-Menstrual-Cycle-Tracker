@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 
+import { useCycleStore } from '../../stores/useCycleStore';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Chip } from '../../components/ui/Chip';
@@ -61,6 +62,7 @@ export default function ProfileScreen() {
   const settings = useSettingsStore((s) => s.settings);
   const update = useSettingsStore((s) => s.update);
   const changeAnchor = useSettingsStore((s) => s.changeAnchor);
+  const refresh = useCycleStore((s) => s.refresh);
 
   const [today] = useState(() => todayIso());
   const [thisYear] = useState(() => currentYear());
@@ -68,7 +70,10 @@ export default function ProfileScreen() {
   const yearChoices = useMemo(() => birthYearQuickChoices(thisYear), [thisYear]);
   const yearMin = yearRange[yearRange.length - 1];
   const yearMax = yearRange[0];
-  const isSelectableStart = useCallback((iso: string) => isSelectableStartDate(today, iso), [today]);
+  const isSelectableStart = useCallback(
+    (iso: string) => isSelectableStartDate(today, iso),
+    [today],
+  );
 
   const [cycleLengthText, setCycleLengthText] = useState(String(settings.reported_cycle_length));
   const [periodLengthText, setPeriodLengthText] = useState(String(settings.reported_period_length));
@@ -77,9 +82,9 @@ export default function ProfileScreen() {
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pendingAnchor, setPendingAnchor] = useState<string | null>(null);
-  const [savingField, setSavingField] = useState<'cycle' | 'period' | 'birthYear' | 'anchor' | null>(
-    null,
-  );
+  const [savingField, setSavingField] = useState<
+    'cycle' | 'period' | 'birthYear' | 'anchor' | null
+  >(null);
 
   const cycleLength = parseNumberInput(cycleLengthText, CYCLE_LENGTH_MIN, CYCLE_LENGTH_MAX);
   const periodLength = parseNumberInput(periodLengthText, PERIOD_LENGTH_MIN, PERIOD_LENGTH_MAX);
@@ -93,6 +98,7 @@ export default function ProfileScreen() {
     setSavingField('cycle');
     await update({ reported_cycle_length: cycleLength.value });
     setSavingField(null);
+    void refresh(today);
   };
 
   const savePeriodLength = async () => {
@@ -100,6 +106,7 @@ export default function ProfileScreen() {
     setSavingField('period');
     await update({ reported_period_length: periodLength.value });
     setSavingField(null);
+    void refresh(today);
   };
 
   const saveBirthYear = async () => {
@@ -107,6 +114,7 @@ export default function ProfileScreen() {
     setSavingField('birthYear');
     await update({ birth_year: birthYear.value });
     setSavingField(null);
+    void refresh(today);
   };
 
   const confirmAnchorChange = (iso: string) => {
@@ -122,6 +130,7 @@ export default function ProfileScreen() {
             await changeAnchor(iso);
             setSavingField(null);
             setPendingAnchor(null);
+            void refresh(today);
           })();
         },
       },
@@ -154,7 +163,12 @@ export default function ProfileScreen() {
           value={periodLength.value}
           text={periodLengthText}
           onChangeText={setPeriodLengthText}
-          errorText={numberFieldError(periodLength.error, PERIOD_LENGTH_MIN, PERIOD_LENGTH_MAX, false)}
+          errorText={numberFieldError(
+            periodLength.error,
+            PERIOD_LENGTH_MIN,
+            PERIOD_LENGTH_MAX,
+            false,
+          )}
           choices={PERIOD_LENGTH_CHOICES}
           pickerMin={PERIOD_LENGTH_MIN}
           pickerMax={PERIOD_LENGTH_MAX}
@@ -188,7 +202,11 @@ export default function ProfileScreen() {
               onPress={() => setBirthYearText(String(y))}
             />
           ))}
-          <Chip label={en.profileClear} selected={birthYearText === ''} onPress={() => setBirthYearText('')} />
+          <Chip
+            label={en.profileClear}
+            selected={birthYearText === ''}
+            onPress={() => setBirthYearText('')}
+          />
         </View>
         <Button
           label={savingField === 'birthYear' ? en.profileSaved : en.profileSave}

@@ -1,6 +1,13 @@
 import { Pressable, Text, View } from 'react-native';
 
-import { flowLabel, moodLabel, symptomLabel, type FlowLevel, type Mood, type Symptom } from '../../core/enums';
+import {
+  flowLabel,
+  moodLabel,
+  symptomLabel,
+  type FlowLevel,
+  type Mood,
+  type Symptom,
+} from '../../core/enums';
 import type { LogRow } from '../../db/repositories/dailyLogs';
 import { en } from '../../i18n/en';
 import { colors } from '../../theme/colors';
@@ -47,7 +54,9 @@ export function LogSummary({ log, onEdit }: LogSummaryProps) {
         </Pressable>
       </View>
       {tags.length > 0 ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm }}>
+        <View
+          style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.sm }}
+        >
           {tags.map((t, i) => (
             <Tag key={`${t}-${i}`} text={t} />
           ))}
