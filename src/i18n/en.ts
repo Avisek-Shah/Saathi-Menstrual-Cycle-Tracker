@@ -55,7 +55,6 @@ export const en = {
   insightsDays: '{n} days',
   insightsCyclesUsed: 'Based on {n} cycles',
   settingsCalendarSystem: 'Calendar system',
-  settingsNotifications: 'Notifications',
 
   // Insights → Cycle overview (§6.5, M10) — the single glanceable summary the user asked for:
   // last period, next period, ovulation, fertile window, cycle day, all in one place.
@@ -88,11 +87,8 @@ export const en = {
   settingsVersionUnknown: 'Version unavailable',
   settingsOn: 'On',
   settingsOff: 'Off',
-  settingsNotifPeriodSoon: 'Period reminder',
-  settingsNotifPeriodToday: 'Day-of reminder',
-  settingsNotifFertileStart: 'Fertile window reminder',
-  settingsNotifDailyLog: 'Daily check-in reminder',
-  settingsNotifCaption: 'Saved now; scheduled reminders arrive with a later update.',
+  // Notification setting labels removed in M11 — the section is hidden until M7 wires
+  // expo-notifications (BUILD_PLAN §6c). The `notif_*` settings keys themselves stay (§4.3).
 
   // Settings → My cycle (§6.7).
   profileTitle: 'My cycle',
@@ -226,12 +222,10 @@ export const en = {
   symptom_spotting_between: 'Spotting between periods',
 
   // Calendar (§6.3). Legend labels mirror the §11.2 day-cell states.
-  legendPeriod: 'Period',
-  legendPredicted: 'Predicted',
-  legendFertile: 'Fertile',
-  legendOvulation: 'Ovulation',
-  legendLogged: 'Log (no flow)',
-  legendToday: 'Today',
+  // §4 (A2) — three legend entries; the texture grammar carries logged-vs-predicted.
+  legendPeriod: 'Period (logged / predicted)',
+  legendFertile: 'Fertile window',
+  legendLogged: 'Logged',
   calendarPrevMonth: 'Previous month',
   calendarNextMonth: 'Next month',
   // Visible glyphs for the prev/next month controls — accessibilityLabel carries the real

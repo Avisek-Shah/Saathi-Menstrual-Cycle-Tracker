@@ -119,37 +119,9 @@ export default function SettingsScreen() {
         </Card>
       </View>
 
-      <View>
-        <SectionLabel label={en.settingsNotifications} />
-        <Card style={{ gap: spacing.sm }}>
-          <ToggleRow
-            label={en.settingsNotifPeriodSoon}
-            value={settings.notif_period_soon}
-            onChange={(v) => update({ notif_period_soon: v })}
-          />
-          <Divider />
-          <ToggleRow
-            label={en.settingsNotifPeriodToday}
-            value={settings.notif_period_today}
-            onChange={(v) => update({ notif_period_today: v })}
-          />
-          <Divider />
-          <ToggleRow
-            label={en.settingsNotifFertileStart}
-            value={settings.notif_fertile_start}
-            onChange={(v) => update({ notif_fertile_start: v })}
-          />
-          <Divider />
-          <ToggleRow
-            label={en.settingsNotifDailyLog}
-            value={settings.notif_daily_log}
-            onChange={(v) => update({ notif_daily_log: v })}
-          />
-          <Text style={{ ...typography.caption, color: colors.textMuted, marginTop: spacing.xs }}>
-            {en.settingsNotifCaption}
-          </Text>
-        </Card>
-      </View>
+      {/* Notifications are hidden until M7 wires expo-notifications — a toggle that animates
+          to "on" and does nothing is the worst pattern in the app (UI/UX spec §7, user
+          choice 2026-09-06). See BUILD_PLAN §6c. */}
 
       <View>
         <SectionLabel label={en.settingsAppSection} />

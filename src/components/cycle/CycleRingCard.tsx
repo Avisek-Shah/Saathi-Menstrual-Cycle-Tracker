@@ -80,21 +80,24 @@ function centreFor(
         eyebrow: fill(en.cycleDay, { day: phase.cycleDay }),
         hero: fill(en.onPeriod, { day: phase.periodDay }),
         chip,
-        ...none,
+        dateLine,
+        toggleable: true,
       };
     case 'fertile':
       return {
         eyebrow: fill(en.cycleDay, { day: phase.cycleDay }),
         hero: fill(en.ringHeroFertile, { n: phase.dayN, total: phase.total }),
         chip,
-        ...none,
+        dateLine,
+        toggleable: true,
       };
     case 'ovulation':
       return {
         eyebrow: fill(en.cycleDay, { day: phase.cycleDay }),
         hero: en.ringHeroOvulation,
         chip,
-        ...none,
+        dateLine,
+        toggleable: true,
       };
     case 'postPeriod':
       return {

@@ -159,46 +159,54 @@ export function MonthGrid({
   );
 }
 
-// §12 rule 6 — labels come from `en`, not literals. Colour + a shape/dot, never colour alone
-// (§2.8). Built from `useColors()` so the colour-blind scheme reaches the swatches too.
-// Reworked to three entries in sub-step 1e.
+// §4 (A2) — three entries once the §2.8 texture grammar carries logged-vs-predicted:
+// Period (a solid swatch + a dashed one), Fertile window (a wash + the ovulation diamond),
+// Logged (a hollow swatch + the entry dot). Labels from `en`; built from `useColors()` so
+// the colour-blind scheme reaches the swatches.
 function LegendRow() {
   const c = useColors();
-  const items = [
-    { label: en.legendPeriod, color: c.periodLogged },
-    { label: en.legendPredicted, color: c.periodPredicted },
-    { label: en.legendFertile, color: c.fertile },
-    { label: en.legendOvulation, color: c.ovulation },
-    { label: en.legendLogged, color: c.surface, dot: true },
-  ];
+  const dot = (extra: object) => (
+    <View style={{ width: 10, height: 10, borderRadius: 5, ...extra }} />
+  );
   return (
     <View
       style={{
         flexDirection: 'row',
         flexWrap: 'wrap',
-        gap: spacing.sm,
+        gap: spacing.md,
         paddingVertical: spacing.md,
         paddingTop: spacing.sm,
       }}
     >
-      {items.map((it) => (
-        <View key={it.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <View
-            style={{
-              width: 10,
-              height: 10,
-              borderRadius: 5,
-              backgroundColor: it.color,
-              borderWidth: it.color === c.surface ? 1 : 0,
-              borderColor: c.border,
-            }}
-          />
-          {it.dot ? (
-            <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: c.textMuted }} />
-          ) : null}
-          <Text style={{ ...typography.caption, color: c.textMuted }}>{it.label}</Text>
-        </View>
-      ))}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        {dot({ backgroundColor: c.periodLogged })}
+        {dot({
+          backgroundColor: c.periodPredicted,
+          borderWidth: 1,
+          borderColor: c.periodPredictedBorder,
+          borderStyle: 'dashed',
+        })}
+        <Text style={{ ...typography.caption, color: c.textMuted }}>{en.legendPeriod}</Text>
+      </View>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        {dot({ backgroundColor: c.fertile })}
+        <View
+          style={{
+            width: 7,
+            height: 7,
+            backgroundColor: c.ovulation,
+            transform: [{ rotate: '45deg' }],
+          }}
+        />
+        <Text style={{ ...typography.caption, color: c.textMuted }}>{en.legendFertile}</Text>
+      </View>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        {dot({ backgroundColor: c.surface, borderWidth: 1, borderColor: c.border })}
+        <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: c.textMuted }} />
+        <Text style={{ ...typography.caption, color: c.textMuted }}>{en.legendLogged}</Text>
+      </View>
     </View>
   );
 }

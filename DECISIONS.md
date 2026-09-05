@@ -49,6 +49,12 @@ Format:
 **Reason:** UI/UX spec §2.7 D–E is more specific and more careful than the single §5.7 "N days later than expected" line. User confirmed A1 on 2026-09-06.
 **Reversible?** yes — `lateState()` logic and copy keys only.
 
+## 2026-09-06 — UTC+05:45 date-storage audit (§11.4) — clean, no change
+
+**Spec section:** UI/UX spec §11.4; REQUIREMENTS §3
+**Decision:** Audited every `new Date` / `toISOString` / `Date.now` / `getUTC` site (M11 sub-step 1e). Result: no date is ever stored or derived through a UTC timestamp. `services/clock.ts#todayIso` builds the string from `getFullYear`/`getMonth`/`getDate` (local components); `core/calendar.ts` uses the local `new Date(y, m, d)` constructor + `date-fns/format`; `components/ui/DatePickerGrid.tsx` parses `iso + 'T12:00:00'` (local noon, so a DST/offset shift cannot flip the day). The only `Date.now()` calls are `daily_logs.created_at` / `updated_at` — epoch-ms audit columns per §4.1, not date logic. `src/core/*` never reads the clock (rule 7). No code changed.
+**Reversible?** n/a — an audit.
+
 ## 2026-09-06 — Notifications section hidden until M7; app lock stays disabled
 
 **Spec section:** UI/UX spec §7, §13 sprint 1 items 5–6; REQUIREMENTS §7, §8
