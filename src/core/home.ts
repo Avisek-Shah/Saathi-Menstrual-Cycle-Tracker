@@ -61,6 +61,11 @@ export function predictionDateRange(dateIso: string, window: number): Prediction
   return { single: null, start: addDays(dateIso, -window), end: addDays(dateIso, window) };
 }
 
+/** §2.6 — the 14-day strip: 5 days before today, today, 8 after (today ~35% from the left). */
+export function linearStripDays(today: string): string[] {
+  return Array.from({ length: 14 }, (_, i) => addDays(today, i - 5));
+}
+
 export type DayCellState =
   'loggedPeriod' | 'ovulation' | 'fertile' | 'predictedPeriod' | 'loggedNoFlow' | 'none';
 

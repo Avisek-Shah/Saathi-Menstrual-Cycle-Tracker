@@ -23,7 +23,10 @@ interface CycleRingCardProps {
 interface Centre {
   eyebrow: string | null;
   hero: string;
+  /** The predicted-date line under the hero — "around 19 Sep". Null when no date applies. */
+  dateLine: string | null;
   chip: string | null;
+  /** Tapping the centre expands `dateLine` between the point date and the ± range. */
   toggleable: boolean;
 }
 
@@ -33,72 +36,80 @@ function confidenceChip(prediction: Prediction): string | null {
   return null;
 }
 
-function dateForm(prediction: Prediction, system: CalendarSystem): string {
+/** "around 19 Sep", or "around 17 – 21 Sep" once expanded (§3 tap behaviour). */
+function dateLineFor(prediction: Prediction, system: CalendarSystem, expanded: boolean): string {
   const range = predictionDateRange(prediction.nextPeriodStart, prediction.predictionWindow);
   const fmt = (iso: string) => formatDate(iso, system, 'd MMM');
-  if (range.single) return fill(en.ringDateAround, { date: fmt(range.single) });
-  return fill(en.predictedRange, { a: fmt(range.start), b: fmt(range.end) });
+  if (expanded && !range.single) {
+    return fill(en.predictedRange, { a: fmt(range.start), b: fmt(range.end) });
+  }
+  return fill(en.ringDateAround, { date: fmt(prediction.nextPeriodStart) });
 }
 
 function centreFor(
   phase: HeroPhase,
   prediction: Prediction,
   system: CalendarSystem,
-  showDate: boolean,
+  expanded: boolean,
 ): Centre {
   const chip = confidenceChip(prediction);
+  const dateLine = dateLineFor(prediction, system, expanded);
+  const none = { dateLine: null, toggleable: false } as const;
+
   switch (phase.phase) {
     case 'noData':
-      return { eyebrow: null, hero: en.ringHeroNoData, chip: null, toggleable: false };
+      return { eyebrow: null, hero: en.ringHeroNoData, chip: null, ...none };
     case 'longGap':
-      return { eyebrow: null, hero: en.ringHeroLongGap, chip: null, toggleable: false };
+      return { eyebrow: null, hero: en.ringHeroLongGap, chip: null, ...none };
     case 'paused':
       return {
         eyebrow: fill(en.cycleDay, { day: phase.cycleDay }),
         hero: en.ringHeroPaused,
         chip: null,
-        toggleable: false,
+        ...none,
       };
     case 'noPeriodYet':
       return {
         eyebrow: fill(en.cycleDay, { day: phase.cycleDay }),
         hero: en.ringHeroNoPeriodYet,
         chip: null,
-        toggleable: false,
+        ...none,
       };
     case 'menstruating':
       return {
         eyebrow: fill(en.cycleDay, { day: phase.cycleDay }),
         hero: fill(en.onPeriod, { day: phase.periodDay }),
         chip,
-        toggleable: false,
-      };
-    case 'postPeriod':
-      return {
-        eyebrow: null,
-        hero: fill(en.cycleDay, { day: phase.cycleDay }),
-        chip,
-        toggleable: false,
+        ...none,
       };
     case 'fertile':
       return {
         eyebrow: fill(en.cycleDay, { day: phase.cycleDay }),
         hero: fill(en.ringHeroFertile, { n: phase.dayN, total: phase.total }),
         chip,
-        toggleable: false,
+        ...none,
       };
     case 'ovulation':
       return {
         eyebrow: fill(en.cycleDay, { day: phase.cycleDay }),
         hero: en.ringHeroOvulation,
         chip,
-        toggleable: false,
+        ...none,
+      };
+    case 'postPeriod':
+      return {
+        eyebrow: null,
+        hero: fill(en.cycleDay, { day: phase.cycleDay }),
+        chip,
+        dateLine,
+        toggleable: true,
       };
     case 'expectedNow':
       return {
         eyebrow: fill(en.cycleDay, { day: phase.cycleDay }),
-        hero: showDate ? dateForm(prediction, system) : en.expectedAroundNow,
+        hero: en.expectedAroundNow,
         chip,
+        dateLine,
         toggleable: true,
       };
     case 'luteal': {
@@ -110,10 +121,9 @@ function centreFor(
           eyebrow,
           hero: fill(en.ringHeroExpectedRange, { a: fmt(range.start), b: fmt(range.end) }),
           chip,
-          toggleable: false,
+          ...none,
         };
       }
-      if (showDate) return { eyebrow, hero: dateForm(prediction, system), chip, toggleable: true };
       const one = phase.daysUntil === 1;
       const hero =
         phase.tier === 'point'
@@ -123,7 +133,7 @@ function centreFor(
           : one
             ? en.ringHeroApproxOne
             : fill(en.ringHeroApprox, { days: phase.daysUntil });
-      return { eyebrow, hero, chip, toggleable: true };
+      return { eyebrow, hero, chip, dateLine, toggleable: true };
     }
   }
 }
@@ -132,16 +142,18 @@ function a11yLabel(phase: HeroPhase, centre: Centre, length: number): string {
   if (phase.phase === 'noData') return en.ringA11yNoData;
   if (phase.phase === 'longGap') return en.ringHeroLongGap;
   const day = 'cycleDay' in phase ? phase.cycleDay : 0;
-  const base = fill(en.ringA11yKnown, { day, length, hero: centre.hero });
+  const hero = centre.dateLine ? `${centre.hero}, ${centre.dateLine}` : centre.hero;
+  const base = fill(en.ringA11yKnown, { day, length, hero });
   return centre.chip ? `${base} ${centre.chip}.` : base;
 }
 
-/** Home hero (UI/UX spec §2.5): the cycle-relative ring with a 3-line centre — eyebrow,
- * phase-aware hero, optional chip. Tapping the centre toggles the countdown ↔ the date. */
+/** Home hero (UI/UX spec §2.5): the cycle-relative ring with a centre of eyebrow, phase-aware
+ * hero, the predicted-date line, and an optional chip. Tapping the centre expands the date to
+ * the ± range. */
 export function CycleRingCard({ model, phase, prediction, calendarSystem }: CycleRingCardProps) {
   const c = useColors();
-  const [showDate, setShowDate] = useState(false);
-  const centre = centreFor(phase, prediction, calendarSystem, showDate);
+  const [expanded, setExpanded] = useState(false);
+  const centre = centreFor(phase, prediction, calendarSystem, expanded);
 
   const body = (
     <>
@@ -164,6 +176,18 @@ export function CycleRingCard({ model, phase, prediction, calendarSystem }: Cycl
       >
         {centre.hero}
       </Text>
+      {centre.dateLine ? (
+        <Text
+          style={{
+            ...typography.caption,
+            color: c.textMuted,
+            textAlign: 'center',
+            marginTop: 2,
+          }}
+        >
+          {centre.dateLine}
+        </Text>
+      ) : null}
       {centre.chip ? (
         <View
           style={{
@@ -197,7 +221,7 @@ export function CycleRingCard({ model, phase, prediction, calendarSystem }: Cycl
       <CycleRing model={model} accessibilityLabel={a11yLabel(phase, centre, model.length)}>
         {centre.toggleable ? (
           <Pressable
-            onPress={() => setShowDate((v) => !v)}
+            onPress={() => setExpanded((v) => !v)}
             accessibilityRole="button"
             accessibilityHint={en.ringToggleHint}
             style={{ alignItems: 'center' }}

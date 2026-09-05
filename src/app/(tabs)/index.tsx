@@ -1,16 +1,14 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppState, View } from 'react-native';
+import { AppState } from 'react-native';
 
-import { formatDate, formatDateRange } from '../../core/calendar';
 import type { Symptom } from '../../core/enums';
 import {
-  cycleDay,
   cycleRingModel,
   currentPeriod,
   heroPhase,
   lastPeriodStartOnOrBefore,
-  predictionDateRange,
+  linearStripDays,
   primaryAction,
 } from '../../core/home';
 import { lateState } from '../../core/prediction';
@@ -23,23 +21,22 @@ import {
 import { IrregularNoticeCard } from '../../components/cycle/IrregularNoticeCard';
 import { CycleRingCard } from '../../components/cycle/CycleRingCard';
 import { FertileCard } from '../../components/cycle/FertileCard';
+import { LinearStrip } from '../../components/cycle/LinearStrip';
 import { LongGapCard } from '../../components/cycle/LongGapCard';
 import { LogSummary } from '../../components/cycle/LogSummary';
-import { MiniStatCard } from '../../components/cycle/MiniStatCard';
 import { QuickLog } from '../../components/cycle/QuickLog';
 import { StartPrompt } from '../../components/cycle/StartPrompt';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 import * as dailyLogs from '../../db/repositories/dailyLogs';
-import { spacing } from '../../theme/spacing';
+import type { LogRow } from '../../db/repositories/dailyLogs';
 import { en } from '../../i18n/en';
 import { todayIso } from '../../services/clock';
 import { useCycleStore } from '../../stores/useCycleStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 
 // SPEC: 2026-08-31 — §6.2 says the quick-log row offers "the user's most-used recent
-// symptoms" without a sample size. 30 days is roughly one full cycle, which is the natural
-// window for "recent" here. See DECISIONS.md.
+// symptoms" without a sample size. 30 days is roughly one full cycle. See DECISIONS.md.
 const RECENT_LOG_SAMPLE = 30;
 
 export default function Home() {
@@ -56,6 +53,9 @@ export default function Home() {
   const [today, setToday] = useState(() => todayIso());
   const [startPromptDismissed, setStartPromptDismissed] = useState(false);
   const [recentSymptoms, setRecentSymptoms] = useState<Symptom[]>([]);
+  const [stripLogs, setStripLogs] = useState<Record<string, LogRow>>({});
+
+  const stripDays = useMemo(() => linearStripDays(today), [today]);
 
   useFocusEffect(
     useCallback(() => {
@@ -75,20 +75,25 @@ export default function Home() {
     return () => sub.remove();
   }, [refresh]);
 
-  // §6.2 quick-log row — most-used recent symptoms, refreshed whenever Home regains focus.
+  // §6.2 quick-log row + §2.6 strip — both need recent log rows; refreshed on focus.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       void dailyLogs.getRecent(RECENT_LOG_SAMPLE, today).then((rows) => {
         if (!cancelled) setRecentSymptoms(rankRecentSymptoms(rows as { symptoms: Symptom[] }[]));
       });
+      void dailyLogs.getRange(stripDays[0], stripDays[stripDays.length - 1]).then((rows) => {
+        if (!cancelled) {
+          setStripLogs(Object.fromEntries(rows.map((r) => [r.date, r])));
+        }
+      });
       return () => {
         cancelled = true;
       };
-    }, [today]),
+    }, [today, stripDays]),
   );
 
-  // Ring model + hero phase + late state, in one memo so the hooks stay unconditional above
+  // Ring model + hero phase + late state in one memo so the hooks stay unconditional above
   // the `!ready` early return. `lateState` needs the anchor, so it is resolved here too.
   const ring = useMemo(() => {
     if (!prediction) return null;
@@ -101,7 +106,6 @@ export default function Home() {
       flowLoggedSinceNextStart: periods.some((p) => p.start_date >= prediction.nextPeriodStart),
     });
     return {
-      anchor,
       late,
       model: cycleRingModel({ periods, prediction, today, late }),
       phase: heroPhase({ periods, prediction, today, late }),
@@ -112,10 +116,8 @@ export default function Home() {
     return <Screen />;
   }
 
-  const { anchor, late, model, phase } = ring;
+  const { late, model, phase } = ring;
   const onPeriod = currentPeriod(periods, today);
-
-  const range = predictionDateRange(prediction.nextPeriodStart, prediction.predictionWindow);
 
   const action = primaryAction({
     onPeriod: onPeriod !== null,
@@ -139,15 +141,7 @@ export default function Home() {
   const showStartPrompt =
     phase.phase === 'noPeriodYet' && phase.showStartPrompt && !startPromptDismissed;
 
-  // Mini-cards only ever show a date within the current cycle (≤45 days out per §5.5's
-  // widest window), so the year is always implicit — dropping it here cuts the label to its
-  // scannable minimum: "24 Sep" instead of "24 Sep 2026".
-  const nextPeriodValue = range.single
-    ? formatDate(range.single, settings.calendar_system, 'd MMM')
-    : formatDateRange(range.start, range.end, settings.calendar_system);
-  const ovulationValue = formatDate(prediction.ovulationDate, settings.calendar_system, 'd MMM');
-
-  // §6.2 — the quick-log row merges into whatever is already logged today; it never opens a modal.
+  // §6.2 — the quick-log row merges into whatever is already logged today; never opens a modal.
   const todaySnapshot: LogSnapshot = {
     flow: (todayLog?.flow as LogSnapshot['flow']) ?? 'none',
     moods: todayLog?.moods ?? [],
@@ -165,7 +159,15 @@ export default function Home() {
   };
 
   return (
-    <Screen bottomInset gap={16}>
+    <Screen
+      gap={16}
+      footer={
+        <Button
+          label={action === 'periodStarted' ? en.myPeriodStarted : en.logToday}
+          onPress={onPrimary}
+        />
+      }
+    >
       {showIrregularNotice ? (
         <IrregularNoticeCard
           onDismiss={() => void updateSettings({ irregular_notice_seen: true })}
@@ -191,15 +193,14 @@ export default function Home() {
         calendarSystem={settings.calendar_system}
       />
 
-      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-        <MiniStatCard label={en.overviewCycleDayLabel} value={String(cycleDay(anchor, today))} />
-        <MiniStatCard label={en.overviewNextPeriod} value={nextPeriodValue} />
-        <MiniStatCard label={en.overviewOvulation} value={ovulationValue} />
-      </View>
-
-      <Button
-        label={action === 'periodStarted' ? en.myPeriodStarted : en.logToday}
-        onPress={onPrimary}
+      <LinearStrip
+        days={stripDays}
+        today={today}
+        logsByDate={stripLogs}
+        periods={periods}
+        prediction={prediction}
+        calendarSystem={settings.calendar_system}
+        onPressDay={(iso) => router.push(`/log/${iso}`)}
       />
 
       {settings.quick_log_enabled ? (

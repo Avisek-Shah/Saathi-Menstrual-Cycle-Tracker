@@ -8,6 +8,7 @@ import {
   estimateTier,
   heroPhase,
   lastPeriodStartOnOrBefore,
+  linearStripDays,
   predictionDateRange,
   primaryAction,
 } from './home';
@@ -72,6 +73,16 @@ describe('currentPeriod / primaryAction', () => {
     expect(primaryAction({ onPeriod: false, hasFlowToday: false, periodExpected: false })).toBe(
       'logToday',
     );
+  });
+});
+
+describe('linearStripDays', () => {
+  it('is 5 before .. today (index 5) .. 8 after — 14 days', () => {
+    const days = linearStripDays('2025-06-15');
+    expect(days).toHaveLength(14);
+    expect(days[0]).toBe('2025-06-10');
+    expect(days[5]).toBe('2025-06-15');
+    expect(days[13]).toBe('2025-06-23');
   });
 });
 
