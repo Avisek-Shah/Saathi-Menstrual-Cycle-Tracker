@@ -1,13 +1,12 @@
-import { AppState } from 'react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, FlatList, Pressable, Text, View } from 'react-native';
+import type { ListRenderItemInfo, ViewToken } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { addMonth, currentMonthFor, getMonthGrid } from '../../core/calendar';
+import { addMonth, currentMonthFor } from '../../core/calendar';
 import { DaySheet } from '../../components/cycle/DaySheet';
-import { MonthGrid } from '../../components/cycle/MonthGrid';
-import { MonthNavButton } from '../../components/ui/MonthNavButton';
+import { MonthListItem } from '../../components/cycle/MonthListItem';
 import { Screen } from '../../components/ui/Screen';
 import { en } from '../../i18n/en';
 import { todayIso } from '../../services/clock';
@@ -20,7 +19,30 @@ import * as dailyLogs from '../../db/repositories/dailyLogs';
 import type { FlowLevel } from '../../core/enums';
 import type { Prediction } from '../../core/prediction';
 
-const SWIPE_THRESHOLD = 50;
+interface MonthKey {
+  year: number;
+  month: number;
+}
+
+// §6.3 — cannot view past current month + 3; predictions beyond that are meaningless. Forward
+// direction is fixed-size, so the initial list is simply generated straight through the cap —
+// there is no forward pagination to write.
+const FORWARD_CAP_MONTHS = 3;
+// How many months of history the list opens with, and how many more it prepends each time
+// `onStartReached` fires. Arbitrary but generous enough that a normal scroll session rarely
+// hits the loading edge.
+const INITIAL_BACK_MONTHS = 12;
+const LOAD_BACK_BATCH = 12;
+
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 60 };
+
+function buildMonthRun(from: MonthKey, count: number): MonthKey[] {
+  return Array.from({ length: count }, (_, i) => addMonth(from.year, from.month, i));
+}
+
+function monthKey(m: MonthKey): string {
+  return `${m.year}-${m.month}`;
+}
 
 // Defensive fallback only: `ready` (checked below before this is used) is set true in
 // useCycleStore.refresh() at the same time as `prediction`, so in practice this never
@@ -42,6 +64,7 @@ const EMPTY_PREDICTION: Prediction = {
 
 export default function CalendarScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const settings = useSettingsStore((s) => s.settings);
   const system = settings.calendar_system ?? 'AD';
   const periods = useCycleStore((s) => s.periods);
@@ -49,22 +72,27 @@ export default function CalendarScreen() {
   const ready = useCycleStore((s) => s.ready);
   const refresh = useCycleStore((s) => s.refresh);
   const saveLog = useCycleStore((s) => s.saveLog);
+  const p = prediction ?? EMPTY_PREDICTION;
 
   const [today, setToday] = useState(() => todayIso());
-  const [cursor, setCursor] = useState(() => currentMonthFor(system, today));
-  const [logs, setLogs] = useState<Record<string, dailyLogs.LogRow>>({});
-  const [selected, setSelected] = useState<string | null>(null);
-
   const current = useMemo(() => currentMonthFor(system, today), [system, today]);
-  const end = useMemo(() => addMonth(current.year, current.month, 3), [current]); // §6.3 — cannot view past current + 3.
+
+  // The list always opens `INITIAL_BACK_MONTHS` before `current`, so `current`'s index in a
+  // freshly (re)built array is always `INITIAL_BACK_MONTHS` — used for `initialScrollIndex`.
+  const [monthList, setMonthList] = useState<MonthKey[]>(() => {
+    const start = addMonth(current.year, current.month, -INITIAL_BACK_MONTHS);
+    return buildMonthRun(start, INITIAL_BACK_MONTHS + FORWARD_CAP_MONTHS + 1);
+  });
 
   // §6.3 — switching AD ↔ BS re-derives the opening month; it never tries to translate the
-  // current cursor between systems. Deliberately keyed on `system` alone (not `today`, not
-  // `current`) — the cursor must NOT jump back to the current month on a midnight rollover
-  // while the user has navigated elsewhere.
+  // scrolled-to position between systems. Deliberately keyed on `system` alone (not `today`,
+  // not `current`) — the list must NOT jump back to the current month on a midnight rollover
+  // while the user has scrolled elsewhere. The `FlatList` below is remounted (`key={system}`)
+  // in step with this so `initialScrollIndex` re-applies to the fresh array.
   useEffect(() => {
+    const start = addMonth(current.year, current.month, -INITIAL_BACK_MONTHS);
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCursor(current);
+    setMonthList(buildMonthRun(start, INITIAL_BACK_MONTHS + FORWARD_CAP_MONTHS + 1));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [system]);
 
@@ -87,48 +115,15 @@ export default function CalendarScreen() {
     return () => sub.remove();
   }, [refreshToday]);
 
-  const canNext = cursor.year < end.year || (cursor.year === end.year && cursor.month < end.month);
-  const canPrev = true;
-
-  const goMonth = useCallback(
-    (delta: number) => {
-      setCursor((c) => {
-        const next = addMonth(c.year, c.month, delta);
-        // Checked against `next` (derived from the real prior `c`), not the outer `canNext` —
-        // that was a stale snapshot from render time. Two `goMonth(1)` calls batched together
-        // (rapid double-tap, or a swipe landing right after a button press) both closed over
-        // the same `canNext`, so the guard passed twice and the cursor skipped one month past
-        // `end`.
-        const overshoots =
-          next.year > end.year || (next.year === end.year && next.month > end.month);
-        if (delta > 0 && overshoots) return c;
-        return next;
-      });
-    },
-    [end],
-  );
-
-  const grid = useMemo(
-    () => getMonthGrid(cursor.year, cursor.month, system, today),
-    [cursor, system, today],
-  );
-  const rangeStart = grid.cells[0].iso;
-  const rangeEnd = grid.cells[grid.cells.length - 1].iso;
-
   const fetchMonthLogs = useCallback(async (start: string, end: string) => {
     const rows = await dailyLogs.getRange(start, end);
     return Object.fromEntries(rows.map((r) => [r.date, r]));
   }, []);
 
-  const reloadMonthLogs = useCallback(async () => {
-    setLogs(await fetchMonthLogs(rangeStart, rangeEnd));
-  }, [fetchMonthLogs, rangeStart, rangeEnd]);
-
-  // Bumped on focus so a day logged elsewhere (Home) shows up here even when the visible
-  // month range hasn't changed — `periods`/`prediction` already refresh on focus via the
-  // cycle store, but this screen's own `logs` map otherwise only refetches when the range
-  // does, and `dayCellState` (core/home.ts) needs both a logged flow and a containing period
-  // to render anything but blank.
+  // Bumped on focus, and after a save, so every currently-mounted `MonthListItem` refetches —
+  // bounded in cost by the `FlatList`'s own virtualization. `periods`/`prediction` already
+  // refresh on focus via the cycle store; this token is what makes each month's own `logs` map
+  // do the same, since a day logged elsewhere (Home) doesn't otherwise change any month's range.
   const [reloadToken, setReloadToken] = useState(0);
 
   useFocusEffect(
@@ -137,24 +132,69 @@ export default function CalendarScreen() {
     }, []),
   );
 
+  const [selected, setSelected] = useState<string | null>(null);
+  const [selectedLog, setSelectedLog] = useState<dailyLogs.LogRow | null>(null);
+
+  // The day sheet needs exactly one row, independent of which months happen to be mounted —
+  // fetched directly rather than read out of a `MonthListItem`'s own (unmounted-if-scrolled-
+  // away) `logs` map.
   useEffect(() => {
     let cancelled = false;
-    void fetchMonthLogs(rangeStart, rangeEnd).then((map) => {
-      if (!cancelled) setLogs(map);
+    if (!selected) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedLog(null);
+      return;
+    }
+    void dailyLogs.getByDate(selected).then((row) => {
+      if (!cancelled) setSelectedLog(row);
     });
     return () => {
       cancelled = true;
     };
-    // reloadToken only forces a refetch on focus; it carries no data of its own.
-  }, [fetchMonthLogs, rangeStart, rangeEnd, reloadToken]);
+  }, [selected, reloadToken]);
 
-  // §6.3 — swipe horizontally between months, in addition to the arrow controls.
-  const swipe = Gesture.Pan()
-    .activeOffsetX([-20, 20])
-    .onEnd((e) => {
-      if (e.translationX <= -SWIPE_THRESHOLD) goMonth(1);
-      else if (e.translationX >= SWIPE_THRESHOLD) goMonth(-1);
+  // Which months are currently on screen, for the "Today" title action below.
+  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(() => new Set());
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      setVisibleKeys(new Set(viewableItems.map((v) => String(v.key))));
+    },
+    [],
+  );
+
+  const flatListRef = useRef<FlatList<MonthKey>>(null);
+
+  const scrollToToday = useCallback(() => {
+    const idx = monthList.findIndex((m) => m.year === current.year && m.month === current.month);
+    if (idx >= 0) flatListRef.current?.scrollToIndex({ index: idx, animated: true });
+  }, [monthList, current]);
+
+  // Unbounded backward scroll: prepend another batch of older months. Forward is not
+  // paginated — the array already runs through the `FORWARD_CAP_MONTHS` cap from the start.
+  const loadMoreBack = useCallback(() => {
+    setMonthList((list) => {
+      if (list.length === 0) return list;
+      const first = list[0];
+      const older = buildMonthRun(
+        addMonth(first.year, first.month, -LOAD_BACK_BATCH),
+        LOAD_BACK_BATCH,
+      );
+      return [...older, ...list];
     });
+  }, []);
+
+  const onScrollToIndexFailed = useCallback(
+    (info: { index: number; averageItemLength: number }) => {
+      flatListRef.current?.scrollToOffset({
+        offset: info.averageItemLength * info.index,
+        animated: false,
+      });
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+      }, 50);
+    },
+    [],
+  );
 
   // Stable identity so `MonthGrid` can memoize its per-cell press handlers instead of
   // rebuilding them on every unrelated re-render.
@@ -162,31 +202,48 @@ export default function CalendarScreen() {
 
   const handleSelectFlow = async (flow: FlowLevel) => {
     if (!selected) return;
-    const existing = logs[selected] ?? null;
     await saveLog(
       selected,
       flow,
-      existing?.moods ?? [],
-      existing?.symptoms ?? [],
-      existing?.note ?? null,
+      selectedLog?.moods ?? [],
+      selectedLog?.symptoms ?? [],
+      selectedLog?.note ?? null,
       today,
     );
-    await reloadMonthLogs();
+    setReloadToken((t) => t + 1);
   };
+
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<MonthKey>) => (
+      <MonthListItem
+        year={item.year}
+        month={item.month}
+        system={system}
+        today={today}
+        periods={periods}
+        prediction={p}
+        selected={selected}
+        reloadToken={reloadToken}
+        onPressDay={handlePress}
+        fetchMonthLogs={fetchMonthLogs}
+      />
+    ),
+    [system, today, periods, p, selected, reloadToken, handlePress, fetchMonthLogs],
+  );
 
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
-  const p = prediction ?? EMPTY_PREDICTION;
+  const showTodayButton = !visibleKeys.has(monthKey(current));
 
   return (
     <Screen
       title={en.calendar}
-      bottomInset
+      scroll={false}
       titleAction={
-        !grid.isCurrentMonth ? (
+        showTodayButton ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => setCursor(current)}
+            onPress={scrollToToday}
             style={{ minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' }}
           >
             <Text style={{ ...typography.body, color: colors.primary }}>{en.calendarToday}</Text>
@@ -194,43 +251,22 @@ export default function CalendarScreen() {
         ) : null
       }
     >
-      <GestureDetector gesture={swipe}>
-        <View style={{ gap: spacing.md }}>
-          <View
-            // No horizontal padding of its own — `Screen` owns it, so the arrows line up with
-            // the grid's outer columns instead of sitting further in.
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <MonthNavButton
-              glyph={en.calendarPrevGlyph}
-              accessibilityLabel={en.calendarPrevMonth}
-              disabled={!canPrev}
-              onPress={() => goMonth(-1)}
-            />
-            <MonthNavButton
-              glyph={en.calendarNextGlyph}
-              accessibilityLabel={en.calendarNextMonth}
-              disabled={!canNext}
-              onPress={() => goMonth(1)}
-            />
-          </View>
-
-          <MonthGrid
-            grid={grid}
-            today={today}
-            periods={periods}
-            prediction={p}
-            monthLogs={logs}
-            system={system}
-            selected={selected}
-            onPressDay={handlePress}
-          />
-        </View>
-      </GestureDetector>
+      <FlatList
+        key={system}
+        ref={flatListRef}
+        data={monthList}
+        keyExtractor={monthKey}
+        renderItem={renderItem}
+        initialScrollIndex={INITIAL_BACK_MONTHS}
+        onScrollToIndexFailed={onScrollToIndexFailed}
+        onStartReached={loadMoreBack}
+        onStartReachedThreshold={2}
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={VIEWABILITY_CONFIG}
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl, gap: spacing.xl }}
+      />
 
       <DaySheet
         dateIso={selected}
@@ -238,7 +274,7 @@ export default function CalendarScreen() {
         system={system}
         periods={periods}
         prediction={p}
-        log={selected ? (logs[selected] ?? null) : null}
+        log={selectedLog}
         onSelectFlow={(flow) => void handleSelectFlow(flow)}
         onEditFull={() => {
           if (selected) router.push(`/log/${selected}`);

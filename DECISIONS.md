@@ -14,6 +14,13 @@ Format:
 
 ---
 
+## 2026-09-06 — Calendar navigation changed from horizontal swipe + arrow buttons to continuous vertical scroll (deviation from §6.3)
+
+**Spec section:** §6.3 (deviation) — updated in this same change
+**Decision:** The calendar tab's month navigation was rebuilt from "swipe horizontally between months, with Prev/Next `MonthNavButton` controls as a fallback for a user who does not swipe" to a continuous vertical scroll through stacked months (`src/app/(tabs)/calendar.tsx`, new `src/components/cycle/MonthListItem.tsx`), rendered via a `FlatList`. Forward is capped at current + 3 months exactly as before (§6.3), now enforced by simply never generating list items past the cap rather than a disabled-button/overshoot-guard check. Backward scrolling is unbounded, loading further history via `onStartReached`. The Prev/Next arrow buttons are removed from this screen entirely — there is no tap-only way to change month anymore on the calendar tab. `REQUIREMENTS.md` §6.3 and `BUILD_PLAN.md`'s M5 entry were updated in the same change to describe the new behaviour, so the spec and the code do not drift apart.
+**Reason:** User request. Flagged before implementing: §6.3 explicitly required the arrow-button fallback for a user who does not swipe, which this change removes with no replacement tap-only path. User was shown this trade-off directly and chose to proceed and amend the spec text rather than keep the buttons.
+**Reversible?** yes — the old cursor/swipe/button implementation is in git history; `MonthNavButton` itself was not deleted (still used by the onboarding/profile date picker in `DatePickerGrid.tsx`), so restoring it to the calendar tab is a self-contained revert.
+
 ## 2026-09-06 — App icon replaced; Android adaptive icon split into proper foreground/background layers
 
 **Spec section:** none (REQUIREMENTS.md has no icon spec; §2 dependency list unaffected — no new package)

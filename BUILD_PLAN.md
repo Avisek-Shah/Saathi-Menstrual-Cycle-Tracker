@@ -136,7 +136,7 @@ The "wait for confirmation" step is worth the extra round trip — it catches mi
 
 ### M5 — Calendar (1–1.5 days)
 
-- Month grid, horizontal swipe, capped at current month + 3
+- Month grid, continuous vertical scroll, capped at current month + 3
 - All day-cell states from §11.2 with shape + colour
 - AD/BS toggle re-gridding to Nepali months
 - Legend
@@ -225,10 +225,10 @@ Spec: §6.1, §6.2, §6.3, §6.3.1, §6.4, §6.5, §6.7, §10.10–13, §11.6, �
 
 - [x] Opening month derived from `today` via `currentBsYear`/`currentBsMonth` — every hardcoded year/month constant removed
 - [x] Today ringed in AD and BS; Today control returns to the current month
-- [x] Horizontal swipe between months, capped at current + 3 via `monthWindow`
+- [x] Continuous vertical scroll between months via a `FlatList`, capped forward at current + 3, unbounded backward
 - [x] Day sheet on tap: state line, logged summary, one-tap flow, edit full log; read-only for future dates
 - [x] One title, one legend
-- [x] Prev/next month controls redone as a visible `MonthNavButton` (filled circle) — the bare glyph read as too small to be a button
+- [x] Prev/next `MonthNavButton` controls removed from the calendar tab (2026-09-06 — see DECISIONS.md); the component itself stays, still used by the onboarding/profile date picker
 
 **Step 5 — Home quick-log**
 

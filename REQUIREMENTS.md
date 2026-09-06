@@ -320,7 +320,7 @@ The three separate stat cards (cycle day / next period / ovulation) are removed 
 
 ### 6.3 Calendar
 
-- Month grid, **swipe horizontally between months**, cannot scroll past current month + 3 (predictions beyond that are meaningless). Arrow controls do the same thing for a user who does not swipe; both respect the cap.
+- Month grid, **continuous vertical scroll through stacked months** (no Prev/Next buttons), cannot scroll past current month + 3 (predictions beyond that are meaningless). Scrolling upward loads older months without limit.
 - **The month shown when the tab opens is the current month in the active calendar system, derived from today's date.** Never a hardcoded year/month constant. Switching AD ↔ BS re-derives it.
 - **Today is always ringed** (§11.2), in both AD and BS mode. A **Today** control returns to the current month whenever the view has moved away from it.
 - Each day cell shows its state colour and a small dot if anything was logged. The selected day carries a ring distinct from today's.
