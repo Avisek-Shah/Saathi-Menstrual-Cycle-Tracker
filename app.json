@@ -29,8 +29,9 @@
       "package": "com.yourname.saathi",
       "versionCode": 2,
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/app-icon-period-tracker.png"
+        "backgroundColor": "#FCE9DA",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },

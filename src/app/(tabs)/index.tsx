@@ -191,6 +191,7 @@ export default function Home() {
         phase={phase}
         prediction={prediction}
         calendarSystem={settings.calendar_system}
+        today={today}
       />
 
       <LinearStrip

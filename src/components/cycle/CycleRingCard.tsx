@@ -18,6 +18,7 @@ interface CycleRingCardProps {
   phase: HeroPhase;
   prediction: Prediction;
   calendarSystem: CalendarSystem;
+  today: string;
 }
 
 interface Centre {
@@ -153,10 +154,23 @@ function a11yLabel(phase: HeroPhase, centre: Centre, length: number): string {
 /** Home hero (UI/UX spec §2.5): the cycle-relative ring with a centre of eyebrow, phase-aware
  * hero, the predicted-date line, and an optional chip. Tapping the centre expands the date to
  * the ± range. */
-export function CycleRingCard({ model, phase, prediction, calendarSystem }: CycleRingCardProps) {
+export function CycleRingCard({
+  model,
+  phase,
+  prediction,
+  calendarSystem,
+  today,
+}: CycleRingCardProps) {
   const c = useColors();
   const [expanded, setExpanded] = useState(false);
   const centre = centreFor(phase, prediction, calendarSystem, expanded);
+  const todayLabel = model.todayDay !== null ? formatDate(today, calendarSystem, 'd') : null;
+  // SPEC: §2.3 fixes the ring at 240dp and typography.hero at 34px, but says nothing about
+  // what happens when eyebrow + a 2-line hero + date line + chip all stack at once (fertile /
+  // ovulation / menstruating phases with a confidence chip) — that combination overflows the
+  // circle and the chip visually collides with the band. Shrinking the hero only in that
+  // crowded case keeps every other phase (single-line hero, no chip) at the spec size.
+  const crowded = Boolean(centre.dateLine && centre.chip);
 
   const body = (
     <>
@@ -168,6 +182,8 @@ export function CycleRingCard({ model, phase, prediction, calendarSystem }: Cycl
       <Text
         style={{
           ...typography.hero,
+          fontSize: crowded ? 22 : typography.hero.fontSize,
+          lineHeight: crowded ? 26 : undefined,
           fontWeight: '600',
           color: c.text,
           textAlign: 'center',
@@ -201,9 +217,17 @@ export function CycleRingCard({ model, phase, prediction, calendarSystem }: Cycl
             backgroundColor: c.bg,
             borderWidth: 1,
             borderColor: c.border,
+            maxWidth: 168,
           }}
         >
-          <Text style={{ ...typography.caption, color: c.textMuted }}>{centre.chip}</Text>
+          <Text
+            style={{ ...typography.caption, color: c.textMuted }}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
+            {centre.chip}
+          </Text>
         </View>
       ) : null}
     </>
@@ -221,7 +245,11 @@ export function CycleRingCard({ model, phase, prediction, calendarSystem }: Cycl
         ...elevation.raised,
       }}
     >
-      <CycleRing model={model} accessibilityLabel={a11yLabel(phase, centre, model.length)}>
+      <CycleRing
+        model={model}
+        todayLabel={todayLabel}
+        accessibilityLabel={a11yLabel(phase, centre, model.length)}
+      >
         {centre.toggleable ? (
           <Pressable
             onPress={() => setExpanded((v) => !v)}

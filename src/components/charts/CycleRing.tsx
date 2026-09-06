@@ -7,7 +7,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle, Line, Path } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 
 import type { CycleRingModel } from '../../core/home';
 import { useColors } from '../../theme/useColors';
@@ -18,6 +18,13 @@ interface CycleRingProps {
   model: CycleRingModel;
   /** Diameter in dp. §2.3 calls for 240; the card may pass a little more. */
   size?: number;
+  /**
+   * Day-of-month for today, drawn inside the today-marker halo.
+   * SPEC: §2.3 says "no numerals on the rim" — user explicitly asked for the date to show
+   * on the ring anyway (2026-09-06); logged in DECISIONS.md. This is the one numeral, and
+   * only ever the single today digit(s), never a full rim of day numbers.
+   */
+  todayLabel?: string | null;
   /** The 3-line centre (eyebrow / hero / chip), rendered over the ring. */
   children?: ReactNode;
   /** One full sentence for TalkBack — the ring is a single accessible element (§10). */
@@ -31,9 +38,16 @@ const PROGRESS_STROKE = 4; // §2.3
  * Cycle-relative ring (UI/UX spec §2.2–2.7). Cycle day 1 at 12 o'clock, clockwise, length
  * `model.length`. Four layers over a neutral track: the menstruation + fertile phase band, a
  * one-day ovulation notch, a thin inner elapsed stroke, and the today-marker. Predicted arcs
- * are soft and feathered; the logged menstruation arc is hard-edged (§2.4). No numerals.
+ * are soft and feathered; the logged menstruation arc is hard-edged (§2.4). No rim numerals —
+ * the sole exception is today's date-of-month inside the today-marker halo (see `todayLabel`).
  */
-export function CycleRing({ model, size = 240, children, accessibilityLabel }: CycleRingProps) {
+export function CycleRing({
+  model,
+  size = 240,
+  todayLabel = null,
+  children,
+  accessibilityLabel,
+}: CycleRingProps) {
   const c = useColors();
   const {
     length: L,
@@ -254,7 +268,9 @@ export function CycleRing({ model, size = 240, children, accessibilityLabel }: C
                 />
               )}
 
-              {/* Today marker — filled dot with a background-coloured halo, highest contrast */}
+              {/* Today marker — background-coloured halo, highest contrast. Carries today's
+                  date-of-month when known (see `todayLabel` SPEC note above); a plain dot
+                  otherwise. */}
               {todayDay !== null && (
                 <>
                   <Circle
@@ -262,13 +278,29 @@ export function CycleRing({ model, size = 240, children, accessibilityLabel }: C
                     cy={xy(bandR, todayDay).y}
                     r={11}
                     fill={c.surface}
+                    stroke={c.todayMarker}
+                    strokeWidth={todayLabel ? 1.5 : 0}
                   />
-                  <Circle
-                    cx={xy(bandR, todayDay).x}
-                    cy={xy(bandR, todayDay).y}
-                    r={6}
-                    fill={c.todayMarker}
-                  />
+                  {todayLabel ? (
+                    <SvgText
+                      x={xy(bandR, todayDay).x}
+                      y={xy(bandR, todayDay).y}
+                      fill={c.todayMarker}
+                      fontSize={todayLabel.length > 1 ? 9 : 11}
+                      fontWeight="700"
+                      textAnchor="middle"
+                      alignmentBaseline="central"
+                    >
+                      {todayLabel}
+                    </SvgText>
+                  ) : (
+                    <Circle
+                      cx={xy(bandR, todayDay).x}
+                      cy={xy(bandR, todayDay).y}
+                      r={6}
+                      fill={c.todayMarker}
+                    />
+                  )}
                 </>
               )}
             </>
