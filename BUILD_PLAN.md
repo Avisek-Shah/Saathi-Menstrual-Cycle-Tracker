@@ -6,17 +6,17 @@ Solo developer + AI agent → private APK distribution to a small group.
 
 ## 1. Plan at a glance
 
-| Phase | Milestones | Focused days | What exists at the end |
-|---|---|---|---|
-| **A. Foundation** | M0–M2 | 3–4 | Repo, DB, and a tested prediction engine with no UI |
-| **B. Core loop** | M3–M4 | 3–4 | Onboarding + Home + logging — the app is usable |
-| **C. Full surface** | M5–M7 | 4–5 | Calendar, Insights, Settings, notifications, PIN |
-| **D. Polish** | M8–M9 | 2–3 | Learn content, edge cases, accessibility |
-| **D2. UX pass** | M10 | 2–3 | The app is comfortable on a real phone: safe areas, typed input, editable profile, interactive calendar, readable journal |
-| **E. Release** | R1–R3 | 1–2 | Signed APK, install guide, delivered to the group |
-| **F. Live** | ongoing | — | Feedback, OTA fixes, v1.1 |
+| Phase               | Milestones | Focused days | What exists at the end                                                                                                    |
+| ------------------- | ---------- | ------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| **A. Foundation**   | M0–M2      | 3–4          | Repo, DB, and a tested prediction engine with no UI                                                                       |
+| **B. Core loop**    | M3–M4      | 3–4          | Onboarding + Home + logging — the app is usable                                                                           |
+| **C. Full surface** | M5–M7      | 4–5          | Calendar, Insights, Settings, notifications, PIN                                                                          |
+| **D. Polish**       | M8–M9      | 2–3          | Learn content, edge cases, accessibility                                                                                  |
+| **D2. UX pass**     | M10        | 2–3          | The app is comfortable on a real phone: safe areas, typed input, editable profile, interactive calendar, readable journal |
+| **E. Release**      | R1–R3      | 1–2          | Signed APK, install guide, delivered to the group                                                                         |
+| **F. Live**         | ongoing    | —            | Feedback, OTA fixes, v1.1                                                                                                 |
 
-**Total: 15–21 focused days.** At 2–3 hours an evening that's roughly 5–7 weeks; over full weekends, 3–4 weeks. The estimate assumes an AI agent writing most of the code and you reviewing every diff — it does *not* assume the agent gets it right first try.
+**Total: 15–21 focused days.** At 2–3 hours an evening that's roughly 5–7 weeks; over full weekends, 3–4 weeks. The estimate assumes an AI agent writing most of the code and you reviewing every diff — it does _not_ assume the agent gets it right first try.
 
 The biggest schedule risk is Phase A. Rushing the prediction engine means paying for it in every later phase with bugs that look like UI bugs but aren't.
 
@@ -62,40 +62,40 @@ The "wait for confirmation" step is worth the extra round trip — it catches mi
 
 ### M0 — Scaffold (0.5 day)
 
-| Task | Notes |
-|---|---|
-| `npx create-expo-app` with TypeScript + expo-router template | |
-| Set `strict: true` in tsconfig | |
-| Install the §2 dependency list | Nothing else |
-| `src/theme/{colors,typography,spacing}.ts` from §11.2–11.3 | Tokens only, no components |
-| `src/i18n/en.ts` with an empty export | |
-| Tab shell: 4 tabs, placeholder screens, correct icons and labels | |
-| ESLint + Prettier, `npm run lint` passes | |
+| Task                                                             | Notes                                    |
+| ---------------------------------------------------------------- | ---------------------------------------- |
+| `npx create-expo-app` with TypeScript + expo-router template     |                                          |
+| Set `strict: true` in tsconfig                                   |                                          |
+| Install the §2 dependency list                                   | Nothing else                             |
+| `src/theme/{colors,typography,spacing}.ts` from §11.2–11.3       | Tokens only, no components               |
+| `src/i18n/en.ts` with an empty export                            |                                          |
+| Tab shell: 4 tabs, placeholder screens, correct icons and labels |                                          |
+| ESLint + Prettier, `npm run lint` passes                         | Added in the hardening pass (2026-09-05) |
 
 **Done when:** app launches on device, four tabs navigate, no console warnings.
 
 ### M1 — Data layer (1 day)
 
-| Task | Notes |
-|---|---|
-| `src/db/client.ts` — open DB, run migrations on first call | |
-| `src/db/schema.ts` — the three tables from §4.1 exactly | |
-| `src/db/migrate.ts` — version runner, v1 only | Don't skip this |
-| `repositories/dailyLogs.ts` — get by date, get range, upsert, delete | |
-| `repositories/periods.ts` — get all, replace all (transactional) | |
-| `repositories/settings.ts` — typed get/set with §4.3 defaults | |
-| `scripts/seed.ts` — the three fixture datasets from §14 | |
+| Task                                                                 | Notes           |
+| -------------------------------------------------------------------- | --------------- |
+| `src/db/client.ts` — open DB, run migrations on first call           |                 |
+| `src/db/schema.ts` — the three tables from §4.1 exactly              |                 |
+| `src/db/migrate.ts` — version runner, v1 only                        | Don't skip this |
+| `repositories/dailyLogs.ts` — get by date, get range, upsert, delete |                 |
+| `repositories/periods.ts` — get all, replace all (transactional)     |                 |
+| `repositories/settings.ts` — typed get/set with §4.3 defaults        |                 |
+| `scripts/seed.ts` — the three fixture datasets from §14              |                 |
 
 **Done when:** the seed script populates a DB and a throwaway screen prints row counts for all three fixtures.
 
-### M2 — The engine (1.5–2 days) ← *the important one*
+### M2 — The engine (1.5–2 days) ← _the important one_
 
-| Task | Notes |
-|---|---|
-| `src/core/dates.ts` — date-only helpers, no Date objects escaping | |
-| `src/core/periods.ts` — `recomputePeriods()` per §4.5, pure | Takes logs, returns periods |
-| `src/core/prediction.ts` — everything in §5, pure | |
-| Unit tests for all boundary cases in §14 | Not "some tests" — the listed ones |
+| Task                                                              | Notes                              |
+| ----------------------------------------------------------------- | ---------------------------------- |
+| `src/core/dates.ts` — date-only helpers, no Date objects escaping |                                    |
+| `src/core/periods.ts` — `recomputePeriods()` per §4.5, pure       | Takes logs, returns periods        |
+| `src/core/prediction.ts` — everything in §5, pure                 |                                    |
+| Unit tests for all boundary cases in §14                          | Not "some tests" — the listed ones |
 
 **Done when:** `npm test` passes with every §14 case covered, and you have manually verified the irregular fixture produces `isIrregular: true` with `predictionWindow: 5`.
 
@@ -152,14 +152,14 @@ The "wait for confirmation" step is worth the extra round trip — it catches mi
 
 ### M7 — Settings, notifications, lock (1.5–2 days)
 
-| Task | Watch out for |
-|---|---|
-| Settings screen, all rows from §6.7 | |
-| `services/notifications.ts` — schedule/cancel/reschedule | Android 13+ needs a runtime `POST_NOTIFICATIONS` request; ask at the *first* time a user enables a reminder, not on launch |
-| Neutral notification copy audit | Grep the whole repo for "period", "cycle", "fertile" inside `notifications.ts` |
-| PIN lock: hash + salt in SecureStore, 30s background trigger, lockout backoff | The no-recovery acknowledgement dialog is not optional |
-| Export to JSON via share sheet | |
-| Delete all data, double confirm | |
+| Task                                                                          | Watch out for                                                                                                              |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Settings screen, all rows from §6.7                                           |                                                                                                                            |
+| `services/notifications.ts` — schedule/cancel/reschedule                      | Android 13+ needs a runtime `POST_NOTIFICATIONS` request; ask at the _first_ time a user enables a reminder, not on launch |
+| Neutral notification copy audit                                               | Grep the whole repo for "period", "cycle", "fertile" inside `notifications.ts`                                             |
+| PIN lock: hash + salt in SecureStore, 30s background trigger, lockout backoff | The no-recovery acknowledgement dialog is not optional                                                                     |
+| Export to JSON via share sheet                                                |                                                                                                                            |
+| Delete all data, double confirm                                               |                                                                                                                            |
 
 ---
 
@@ -188,11 +188,11 @@ Work through REQUIREMENTS §10 as an explicit checklist, one commit per case. Th
 
 As of 2026-08-31 the repository does **not** contain everything the milestones above claim. Verified against the tree:
 
-| Milestone | Claimed | Actually in the repo |
-|---|---|---|
-| M6 Insights | stats, three charts, cycle history | two stat rows; `src/components/charts/` is empty; no history list |
-| M7 Settings, notifications, PIN, export | complete | `src/services/` holds only `clock.ts`; no `notifications.ts`, `lock.ts`, `export.ts`, no `app/lock.tsx`; settings screen is a two-row stub |
-| M8 Learn | six articles | `src/content/learn/article-5.md` only; no `app/learn/` route |
+| Milestone                               | Claimed                            | Actually in the repo                                                                                                                       |
+| --------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| M6 Insights                             | stats, three charts, cycle history | cycle overview card; no history list or full charts                            |
+| M7 Settings, notifications, PIN, export | complete                           | `src/services/` holds only `clock.ts`; no `notifications.ts`, `lock.ts`, `export.ts`, no `app/lock.tsx`; settings screen is a two-row stub |
+| M8 Learn                                | six articles                       | `src/content/learn/article-5.md` only; no `app/learn/` route                                                                               |
 
 M10 does not build those. They stay owned by M6, M7, and M8 and must be finished before release — §15 acceptance depends on notifications, the PIN, delete-all, and the charts. Settings rows for the unbuilt features render in a visibly disabled state rather than pretending to work.
 
@@ -256,11 +256,46 @@ Spec: §6.1, §6.2, §6.3, §6.3.1, §6.4, §6.5, §6.7, §10.10–13, §11.6, �
 - [x] Elevation tokens (`theme/elevation.ts`); palette unchanged (§11.2)
 - [x] Card / StatusCard shadow depth
 - [x] `MonthNavButton` — calendar and date-picker month controls are now a filled circular button, not a bare small glyph
-- [ ] Status card hero with an SVG cycle-day ring — **not built**; `react-native-svg` is available but this specific visual wasn't done in this pass
-- [ ] Reanimated transitions ≤ 200 ms, disabled under reduce-motion — **not built**; screens change state instantly, no animation layer added yet
+- [x] Status card hero with an SVG cycle-day ring — built as `CycleRing.tsx` → `CycleRingCard.tsx`, rendered on Home tab
+- [ ] Reanimated transitions ≤ 200 ms, disabled under reduce-motion — **partly built**: `CycleRing.tsx:107–113` respects reduce-motion for the ring; screen transitions are instant
 - [x] Every new string in `src/i18n/en.ts`
 
 **Done when:** the new §15 acceptance boxes pass on a real gesture-navigation phone, `npm test` and `npm run typecheck` are green, and the sensitive copy in §5.6, §6.2, §7, and §8 is byte-identical to before the pass.
+
+---
+
+## 6c. Phase G — UI/UX rebuild (M11–M13)
+
+`SAATHI_UIUX_SPEC.md` was adopted as the UI/UX authority on 2026-09-06 (`DECISIONS.md`). It is a review-and-rebuild of the shipped surface: a cycle-relative ring, one honest date model, a colour-blind-safe palette, phase-aware copy, real Insights charts. Its §13 build order maps to three milestones. The prediction engine (§5) is affirmed correct by the UI/UX spec §1 and is not touched.
+
+### M11 — Sprint 1 (P0, trust)
+
+Five commits, in order:
+
+| Sub-step | Contents                                                                                                                                                                            |
+| -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1a       | Doc reconciliation — this section, REQUIREMENTS §0/§5.7/§6.2/§11.1/§11.2/§11.5/§16, `DECISIONS.md` entries                                                                            |
+| 1b       | Blue-violet palette (§2.8), two-signal texture/glyph grammar, `color_blind_mode` setting + Settings toggle + `palette.ts` resolver                                                     |
+| 1c       | Cycle-relative ring rebuild (§2.2–2.7) — 4 layers, feathered predicted arcs, no numerals, late / ghost states, `strokeDasharray` sweep; `core/home.ts` `cycleRingDays()` + `heroState()` + tests |
+| 1d       | 14-day linear strip (§2.6, horizontal `FlatList`), delete the 3 stat cards, sticky "Log today", fertile disclaimer as a bordered callout                                               |
+| 1e       | Calendar legend 3-up (§4), hide the notifications section (§7 — user chose "hide", not "implement"), UTC+05:45 date-storage audit (§11.4)                                               |
+
+**Done when:** the UI/UX spec §14 ring acceptance checklist passes, `npm test` + `npm run typecheck` are green, and the sensitive-copy rules in REQUIREMENTS §5.6 / §6.2 / §7 / §8 still hold — late-period wording changes per `DECISIONS.md` 2026-09-06 (A1); nothing else moves.
+
+### M12 — Sprint 2 (P1, comprehension)
+
+Full log bottom sheet (§6); Insights cycle-history bar chart + statistics block (§5 — this is the never-built M6); privacy-first onboarding pass (§8); TalkBack labels + 200% font scaling (§10); single-commit settings model + complete Data section (§7); confirm `src/core/` is dependency-free (§11.3). Charts use `react-native-svg` + `react-native-reanimated` only — no charting dependency (§11.1).
+
+### M13 — Sprint 3 (P2)
+
+Symptom-pattern heat strip (§5); dark-theme wiring (§2.8, §10 — colour-blind mode already shipped in M11); PDF export for clinician visits (§5 — needs `expo-print` + `expo-sharing`, **ask before adding**); calendar cycle bands + jump-to-month (§4); haptics + micro-interactions + empty states (§12 — needs `expo-haptics`, **ask before adding**).
+
+### Still owed from earlier phases, not covered by M11–M13
+
+- **Notifications** (M7) — the user chose to hide the section in M11, not implement it. Local scheduling with `expo-notifications` is still required for §15 acceptance and stays M7 scope.
+- **PIN app lock** (M7) — stays a disabled row through M11. Needs `expo-secure-store` + `expo-local-authentication`.
+- **Delete all data / export** (M7).
+- **Learn articles 1–4 and 6** (M8) — only article 5 exists.
 
 ---
 
@@ -302,7 +337,7 @@ Spec: §6.1, §6.2, §6.3, §6.3.1, §6.4, §6.5, §6.7, §10.10–13, §11.6, �
 }
 ```
 
-`runtimeVersion: fingerprint` means the runtime ID changes only when native code changes — so JS-only fixes ship OTA and native changes correctly refuse to. And `POST_NOTIFICATIONS` should be the *only* permission in that array; if the agent added others, find out why and remove them.
+`runtimeVersion: fingerprint` means the runtime ID changes only when native code changes — so JS-only fixes ship OTA and native changes correctly refuse to. And `POST_NOTIFICATIONS` should be the _only_ permission in that array; if the agent added others, find out why and remove them.
 
 ### R2 — The keystore (read this twice)
 
@@ -319,7 +354,7 @@ eas credentials
 
 Store that file and its passwords somewhere you will still have them in two years — a password manager, not a laptop folder.
 
-Why this matters more for you than for a Play Store app: your users install by sideloading. If you later build with a *different* keystore, Android refuses to install the new APK over the old one. The only fix is uninstall-and-reinstall, and since there is no backup in v1, **every user loses all her data.** That is the worst failure mode in this entire plan, and it's caused by a lost file rather than any bug.
+Why this matters more for you than for a Play Store app: your users install by sideloading. If you later build with a _different_ keystore, Android refuses to install the new APK over the old one. The only fix is uninstall-and-reinstall, and since there is no backup in v1, **every user loses all her data.** That is the worst failure mode in this entire plan, and it's caused by a lost file rather than any bug.
 
 ### R3 — Ship
 
@@ -329,11 +364,11 @@ eas build --profile preview --platform android
 
 EAS returns a download URL and a QR code.
 
-| Delivery method | Good for | Watch out |
-|---|---|---|
-| EAS internal distribution link | Simplest — send the URL, page handles install | Link expires after 30 days |
-| Google Drive link | Permanent, familiar | Drive warns about APK files |
-| Direct file over WhatsApp/Viber | Works offline, no account needed | Some clients block `.apk`; zip it |
+| Delivery method                 | Good for                                      | Watch out                         |
+| ------------------------------- | --------------------------------------------- | --------------------------------- |
+| EAS internal distribution link  | Simplest — send the URL, page handles install | Link expires after 30 days        |
+| Google Drive link               | Permanent, familiar                           | Drive warns about APK files       |
+| Direct file over WhatsApp/Viber | Works offline, no account needed              | Some clients block `.apk`; zip it |
 
 For a small private group: **Drive with a stable filename** (`saathi-v1.0.0.apk`), link shared over whatever messenger the group already uses.
 
@@ -382,7 +417,7 @@ Practically: batch small fixes and push OTA weekly at most. Avoid native changes
 You have no analytics and no crash reporting, deliberately. So:
 
 - Pick 2–3 people from the group as first testers. Give them the APK a week before everyone else.
-- Ask one specific question rather than "any feedback?" — try *"Did the predicted date match what actually happened?"* That's the only question whose answer tells you if the product works.
+- Ask one specific question rather than "any feedback?" — try _"Did the predicted date match what actually happened?"_ That's the only question whose answer tells you if the product works.
 - Add an "Email feedback" row in Settings that opens a `mailto:` with the app version pre-filled. No data attached, ever.
 - Keep a plain text file of reported issues. At this scale, a file beats a tracker.
 
@@ -405,15 +440,15 @@ Cycle feedback is slow by nature. A month of real data is worth more than any am
 
 ## 10. Risk register
 
-| Risk | Likelihood | Impact | Mitigation |
-|---|---|---|---|
-| Lost keystore | Low | **Severe** — every user loses all data | Back it up at R2, twice, in two places |
-| Prediction engine has a subtle bug | Medium | High — wrong output, confidently shown | M2 tests before any UI; review that file personally |
-| Agent drifts from spec across milestones | Medium | Medium | One milestone per conversation; review every diff |
-| BS calendar off-by-one on month lengths | Medium | Medium | Test a 32-day month specifically |
-| Notification leaks context on a shared phone | Low | High — this is the trust promise | Grep audit in M7 |
-| Scope creep into pregnancy/pill tracking | High | Medium — delays launch indefinitely | §17 is a hard list; new ideas go to DECISIONS.md, not the branch |
-| Users can't sideload without help | Medium | Low | Written guide + walk the first two through it in person |
+| Risk                                         | Likelihood | Impact                                 | Mitigation                                                       |
+| -------------------------------------------- | ---------- | -------------------------------------- | ---------------------------------------------------------------- |
+| Lost keystore                                | Low        | **Severe** — every user loses all data | Back it up at R2, twice, in two places                           |
+| Prediction engine has a subtle bug           | Medium     | High — wrong output, confidently shown | M2 tests before any UI; review that file personally              |
+| Agent drifts from spec across milestones     | Medium     | Medium                                 | One milestone per conversation; review every diff                |
+| BS calendar off-by-one on month lengths      | Medium     | Medium                                 | Test a 32-day month specifically                                 |
+| Notification leaks context on a shared phone | Low        | High — this is the trust promise       | Grep audit in M7                                                 |
+| Scope creep into pregnancy/pill tracking     | High       | Medium — delays launch indefinitely    | §17 is a hard list; new ideas go to DECISIONS.md, not the branch |
+| Users can't sideload without help            | Medium     | Low                                    | Written guide + walk the first two through it in person          |
 
 ---
 
@@ -421,7 +456,7 @@ Cycle feedback is slow by nature. A month of real data is worth more than any am
 
 Ask yourself these four every week, honestly:
 
-1. Which milestone am I on, and is it actually *done* or just mostly working?
+1. Which milestone am I on, and is it actually _done_ or just mostly working?
 2. Did I review every diff, or did I start rubber-stamping?
 3. Has anything crept in that REQUIREMENTS §17 says is out of scope?
 4. Is the keystore backed up?

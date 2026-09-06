@@ -34,7 +34,12 @@ function periodsFromCycles(
     });
     start = addDays(start, cycleLength);
   }
-  periods.push({ start_date: start, cycle_length: null, length_days: periodLength, is_outlier: false });
+  periods.push({
+    start_date: start,
+    cycle_length: null,
+    length_days: periodLength,
+    is_outlier: false,
+  });
   return periods;
 }
 
@@ -70,7 +75,11 @@ describe('predict — weighted average + clamping (§5.2)', () => {
 
   it('clamps the 1-cycle blend', () => {
     // 0.5*45 + 0.5*99 = 72 -> clamp 45
-    const p = predict(periodsFromCycles([45]), { reported_cycle_length: 99, reported_period_length: 5 }, FUTURE);
+    const p = predict(
+      periodsFromCycles([45]),
+      { reported_cycle_length: 99, reported_period_length: 5 },
+      FUTURE,
+    );
     expect(p.avgCycleLength).toBe(45);
   });
 });
@@ -78,7 +87,13 @@ describe('predict — weighted average + clamping (§5.2)', () => {
 describe('predict — cold-start tiers (§5.4)', () => {
   it('0 cycles: uses reported values, low confidence', () => {
     const p = predict([], REPORTED, FUTURE);
-    expect(p).toMatchObject({ avgCycleLength: 28, avgPeriodLength: 5, confidence: 'low', cyclesUsed: 0, isIrregular: false });
+    expect(p).toMatchObject({
+      avgCycleLength: 28,
+      avgPeriodLength: 5,
+      confidence: 'low',
+      cyclesUsed: 0,
+      isIrregular: false,
+    });
   });
 
   it('1 cycle: 50/50 blend of observed and reported, low confidence', () => {
@@ -177,23 +192,46 @@ describe('lateState (§5.7)', () => {
   };
 
   it('before the predicted date: upcoming', () => {
-    expect(lateState({ ...base, today: '2025-06-05' })).toEqual({ status: 'upcoming', daysUntil: 5 });
+    expect(lateState({ ...base, today: '2025-06-05' })).toEqual({
+      status: 'upcoming',
+      daysUntil: 5,
+    });
   });
 
   it('day 1 past .. day = window: expected around now', () => {
-    expect(lateState({ ...base, today: '2025-06-11' })).toEqual({ status: 'expectedNow', daysPast: 1 });
-    expect(lateState({ ...base, today: '2025-06-13' })).toEqual({ status: 'expectedNow', daysPast: 3 });
+    expect(lateState({ ...base, today: '2025-06-11' })).toEqual({
+      status: 'expectedNow',
+      daysPast: 1,
+    });
+    expect(lateState({ ...base, today: '2025-06-13' })).toEqual({
+      status: 'expectedNow',
+      daysPast: 3,
+    });
   });
 
-  it('day window + 1: late', () => {
-    expect(lateState({ ...base, today: '2025-06-14' })).toEqual({ status: 'late', daysPast: 4 });
+  it('window+1 .. 7: no period logged yet; the start prompt appears from day 2 of the tier', () => {
+    expect(lateState({ ...base, today: '2025-06-14' })).toEqual({
+      status: 'noPeriodYet',
+      daysPast: 4,
+      showStartPrompt: false,
+    });
+    expect(lateState({ ...base, today: '2025-06-15' })).toEqual({
+      status: 'noPeriodYet',
+      daysPast: 5,
+      showStartPrompt: true,
+    });
   });
 
-  it('45 days since the last period start: offer to recalculate', () => {
-    expect(lateState({ ...base, today: '2025-06-27' })).toEqual({
-      status: 'offerRecalculate',
-      daysPast: 17,
-      daysSinceLastPeriodStart: 45,
+  it('8+ days past: predictions paused', () => {
+    expect(lateState({ ...base, today: '2025-06-18' })).toEqual({ status: 'paused', daysPast: 8 });
+    expect(lateState({ ...base, today: '2025-06-27' })).toEqual({ status: 'paused', daysPast: 17 });
+  });
+
+  it('60+ days since the last period start: long gap, re-anchor', () => {
+    expect(lateState({ ...base, today: '2025-07-12' })).toEqual({
+      status: 'longGap',
+      daysPast: 32,
+      daysSinceLastPeriodStart: 60,
     });
   });
 

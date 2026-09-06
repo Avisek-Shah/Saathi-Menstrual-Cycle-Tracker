@@ -42,7 +42,14 @@ function Tag({ text }: { text: string }) {
  * `rows` and pagination are owned by the screen (`dailyLogs.getRecent`); this component only
  * groups and renders what it is given.
  */
-export function JournalTimeline({ rows, system, hasMore, loadingMore, onPressDay, onLoadMore }: JournalTimelineProps) {
+export function JournalTimeline({
+  rows,
+  system,
+  hasMore,
+  loadingMore,
+  onPressDay,
+  onLoadMore,
+}: JournalTimelineProps) {
   if (rows.length === 0) {
     return (
       <Card>

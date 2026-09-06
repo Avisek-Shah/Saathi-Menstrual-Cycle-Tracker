@@ -1,47 +1,61 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { formatDate } from '../../core/calendar';
 import type { Symptom } from '../../core/enums';
 import {
-  cycleDay,
+  cycleRingModel,
   currentPeriod,
+  heroPhase,
   lastPeriodStartOnOrBefore,
-  predictionDateRange,
+  linearStripDays,
   primaryAction,
 } from '../../core/home';
 import { lateState } from '../../core/prediction';
-import { applyQuickToggle, quickLogOptions, rankRecentSymptoms, type LogSnapshot } from '../../core/quickLog';
+import {
+  applyQuickToggle,
+  quickLogOptions,
+  rankRecentSymptoms,
+  type LogSnapshot,
+} from '../../core/quickLog';
 import { IrregularNoticeCard } from '../../components/cycle/IrregularNoticeCard';
+import { CycleRingCard } from '../../components/cycle/CycleRingCard';
 import { FertileCard } from '../../components/cycle/FertileCard';
+import { LinearStrip } from '../../components/cycle/LinearStrip';
+import { LongGapCard } from '../../components/cycle/LongGapCard';
 import { LogSummary } from '../../components/cycle/LogSummary';
 import { QuickLog } from '../../components/cycle/QuickLog';
-import { RecalcCard } from '../../components/cycle/RecalcCard';
-import { StatusCard } from '../../components/cycle/StatusCard';
-import { WeekStrip } from '../../components/cycle/WeekStrip';
+import { StartPrompt } from '../../components/cycle/StartPrompt';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 import * as dailyLogs from '../../db/repositories/dailyLogs';
-import { en, fill } from '../../i18n/en';
+import type { LogRow } from '../../db/repositories/dailyLogs';
+import { en } from '../../i18n/en';
 import { todayIso } from '../../services/clock';
 import { useCycleStore } from '../../stores/useCycleStore';
 import { useSettingsStore } from '../../stores/useSettingsStore';
 
 // SPEC: 2026-08-31 — §6.2 says the quick-log row offers "the user's most-used recent
-// symptoms" without a sample size. 30 days is roughly one full cycle, which is the natural
-// window for "recent" here. See DECISIONS.md.
+// symptoms" without a sample size. 30 days is roughly one full cycle. See DECISIONS.md.
 const RECENT_LOG_SAMPLE = 30;
 
 export default function Home() {
   const router = useRouter();
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.update);
-  const { prediction, periods, todayLog, weekLogs, ready, refresh, saveLog } = useCycleStore();
+  const prediction = useCycleStore((s) => s.prediction);
+  const periods = useCycleStore((s) => s.periods);
+  const todayLog = useCycleStore((s) => s.todayLog);
+  const ready = useCycleStore((s) => s.ready);
+  const refresh = useCycleStore((s) => s.refresh);
+  const saveLog = useCycleStore((s) => s.saveLog);
 
-  const [today, setToday] = useState(todayIso());
-  const [recalcDismissed, setRecalcDismissed] = useState(false);
+  const [today, setToday] = useState(() => todayIso());
+  const [startPromptDismissed, setStartPromptDismissed] = useState(false);
   const [recentSymptoms, setRecentSymptoms] = useState<Symptom[]>([]);
+  const [stripLogs, setStripLogs] = useState<Record<string, LogRow>>({});
+
+  const stripDays = useMemo(() => linearStripDays(today), [today]);
 
   useFocusEffect(
     useCallback(() => {
@@ -61,64 +75,58 @@ export default function Home() {
     return () => sub.remove();
   }, [refresh]);
 
-  // §5.6 — reset the notice flag when cycles stop being irregular, so a later re-detection shows it again.
-  useEffect(() => {
-    if (!prediction) return;
-    if (!prediction.isIrregular && settings.irregular_notice_seen) {
-      void updateSettings({ irregular_notice_seen: false });
-    }
-  }, [prediction, settings.irregular_notice_seen, updateSettings]);
-
-  // §6.2 quick-log row — most-used recent symptoms, refreshed whenever Home regains focus.
+  // §6.2 quick-log row + §2.6 strip — both need recent log rows; refreshed on focus.
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
       void dailyLogs.getRecent(RECENT_LOG_SAMPLE, today).then((rows) => {
         if (!cancelled) setRecentSymptoms(rankRecentSymptoms(rows as { symptoms: Symptom[] }[]));
       });
+      void dailyLogs.getRange(stripDays[0], stripDays[stripDays.length - 1]).then((rows) => {
+        if (!cancelled) {
+          setStripLogs(Object.fromEntries(rows.map((r) => [r.date, r])));
+        }
+      });
       return () => {
         cancelled = true;
       };
-    }, [today]),
+    }, [today, stripDays]),
   );
 
-  if (!ready || !prediction) {
+  // Ring model + hero phase + late state in one memo so the hooks stay unconditional above
+  // the `!ready` early return. `lateState` needs the anchor, so it is resolved here too.
+  const ring = useMemo(() => {
+    if (!prediction) return null;
+    const anchor = lastPeriodStartOnOrBefore(periods, today);
+    const late = lateState({
+      nextPeriodStart: prediction.nextPeriodStart,
+      predictionWindow: prediction.predictionWindow,
+      lastPeriodStart: anchor,
+      today,
+      flowLoggedSinceNextStart: periods.some((p) => p.start_date >= prediction.nextPeriodStart),
+    });
+    return {
+      late,
+      model: cycleRingModel({ periods, prediction, today, late }),
+      phase: heroPhase({ periods, prediction, today, late }),
+    };
+  }, [prediction, periods, today]);
+
+  if (!ready || !prediction || !ring) {
     return <Screen />;
   }
 
-  const anchor = lastPeriodStartOnOrBefore(periods, today);
+  const { late, model, phase } = ring;
   const onPeriod = currentPeriod(periods, today);
-  const late = lateState({
-    nextPeriodStart: prediction.nextPeriodStart,
-    predictionWindow: prediction.predictionWindow,
-    lastPeriodStart: anchor,
-    today,
-    flowLoggedSinceNextStart: periods.some((p) => p.start_date >= prediction.nextPeriodStart),
-  });
-
-  const headline = (() => {
-    if (onPeriod) {
-      return fill(en.onPeriod, { day: cycleDay(onPeriod.start_date, today) });
-    }
-    if (late.status === 'expectedNow' || late.status === 'offerRecalculate') return en.expectedAroundNow;
-    if (late.status === 'late') return fill(en.lateBy, { days: late.daysPast });
-    const daysUntil = late.status === 'upcoming' ? late.daysUntil : 0;
-    return daysUntil === 1 ? en.periodInOne : fill(en.periodIn, { days: daysUntil });
-  })();
-
-  const range = predictionDateRange(prediction.nextPeriodStart, prediction.predictionWindow);
-  const dateLine = range.single
-    ? fill(en.predictedOn, { date: formatDate(range.single, settings.calendar_system) })
-    : fill(en.predictedRange, {
-        a: formatDate(range.start, settings.calendar_system),
-        b: formatDate(range.end, settings.calendar_system),
-      });
 
   const action = primaryAction({
     onPeriod: onPeriod !== null,
     hasFlowToday: todayLog !== null && todayLog.flow !== 'none',
     periodExpected:
-      late.status === 'expectedNow' || late.status === 'late' || late.status === 'offerRecalculate',
+      late.status === 'expectedNow' ||
+      late.status === 'noPeriodYet' ||
+      late.status === 'paused' ||
+      late.status === 'longGap',
   });
 
   const onPrimary = () => {
@@ -130,9 +138,10 @@ export default function Home() {
   };
 
   const showIrregularNotice = prediction.isIrregular && !settings.irregular_notice_seen;
-  const showRecalc = late.status === 'offerRecalculate' && !recalcDismissed;
+  const showStartPrompt =
+    phase.phase === 'noPeriodYet' && phase.showStartPrompt && !startPromptDismissed;
 
-  // §6.2 — the quick-log row merges into whatever is already logged today; it never opens a modal.
+  // §6.2 — the quick-log row merges into whatever is already logged today; never opens a modal.
   const todaySnapshot: LogSnapshot = {
     flow: (todayLog?.flow as LogSnapshot['flow']) ?? 'none',
     moods: todayLog?.moods ?? [],
@@ -150,45 +159,60 @@ export default function Home() {
   };
 
   return (
-    <Screen bottomInset gap={16}>
+    <Screen
+      gap={16}
+      footer={
+        <Button
+          label={action === 'periodStarted' ? en.myPeriodStarted : en.logToday}
+          onPress={onPrimary}
+        />
+      }
+    >
       {showIrregularNotice ? (
-        <IrregularNoticeCard onDismiss={() => void updateSettings({ irregular_notice_seen: true })} />
-      ) : null}
-      {showRecalc ? (
-        <RecalcCard
-          onRecalculate={() => {
-            setRecalcDismissed(true);
-            void refresh(today);
-          }}
-          onDismiss={() => setRecalcDismissed(true)}
+        <IrregularNoticeCard
+          onDismiss={() => void updateSettings({ irregular_notice_seen: true })}
         />
       ) : null}
+      {showStartPrompt ? (
+        <StartPrompt
+          onConfirm={() => {
+            setStartPromptDismissed(true);
+            void saveLog(today, 'medium', [], [], null, today);
+          }}
+          onDismiss={() => setStartPromptDismissed(true)}
+        />
+      ) : null}
+      {phase.phase === 'longGap' ? (
+        <LongGapCard onReanchor={() => router.push('/settings/profile')} />
+      ) : null}
 
-      <StatusCard
-        headline={headline}
-        dateLine={dateLine}
-        cycleDayLabel={fill(en.cycleDay, { day: cycleDay(anchor, today) })}
-        confidenceLabel={prediction.confidence === 'low' ? en.confidenceEstimate : null}
+      <CycleRingCard
+        model={model}
+        phase={phase}
+        prediction={prediction}
+        calendarSystem={settings.calendar_system}
+        today={today}
       />
 
-      <Button
-        label={action === 'periodStarted' ? en.myPeriodStarted : en.logToday}
-        onPress={onPrimary}
+      <LinearStrip
+        days={stripDays}
+        today={today}
+        logsByDate={stripLogs}
+        periods={periods}
+        prediction={prediction}
+        calendarSystem={settings.calendar_system}
+        onPressDay={(iso) => router.push(`/log/${iso}`)}
       />
 
       {settings.quick_log_enabled ? (
         <QuickLog options={quickOptions} onToggle={onQuickToggle} />
       ) : null}
 
-      <WeekStrip
-        today={today}
-        periods={periods}
+      <FertileCard
         prediction={prediction}
-        weekLogs={weekLogs}
-        onPressDay={(dateIso) => router.push(`/log/${dateIso}`)}
+        calendarSystem={settings.calendar_system}
+        today={today}
       />
-
-      <FertileCard prediction={prediction} calendarSystem={settings.calendar_system} today={today} />
 
       <LogSummary log={todayLog} onEdit={() => router.push(`/log/${today}`)} />
     </Screen>

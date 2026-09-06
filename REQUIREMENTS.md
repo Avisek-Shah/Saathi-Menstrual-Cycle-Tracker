@@ -1,4 +1,5 @@
 # Saathi — Menstrual Cycle Tracker
+
 ## Product & Engineering Requirements (v1)
 
 ---
@@ -6,6 +7,10 @@
 ## 0. How to use this document
 
 This is the complete build specification for v1. Build in the milestone order given in `BUILD_PLAN.md`. Where this document specifies an algorithm, schema, or enum, implement it exactly — do not substitute an equivalent. Where something is genuinely unspecified, follow §18 and pick the simplest option, then record it in `DECISIONS.md`.
+
+### UI/UX authority
+
+`SAATHI_UIUX_SPEC.md` was adopted on 2026-09-06 (see `DECISIONS.md`) as the authority for all screen layout, cycle visualization, colour, user-facing copy, and interaction detail. This document stays authoritative for the domain rules (§3), the data model (§4), the prediction engine (§5 — the UI/UX spec §1 confirms the engine is correct and is not to be changed), notification copy (§7), the PIN (§8), and the BS calendar (§9). Where the two disagree on UI, the UI/UX spec wins. Its §13 build order is milestones M11–M13 (§16, and `BUILD_PLAN.md` §6c).
 
 ---
 
@@ -35,25 +40,25 @@ A privacy-first Android app (React Native + Expo) for tracking menstrual cycles,
 
 ## 2. Tech stack
 
-| Concern | Choice | Notes |
-|---|---|---|
-| Framework | Expo (managed workflow), latest stable SDK | |
-| Language | TypeScript, `strict: true` | |
-| Navigation | `expo-router` with a bottom tab layout | |
-| Local DB | `expo-sqlite` | Source of truth for all user data |
-| State | `zustand` | One store per domain; DB access only via repositories (§4.4) |
-| Dates | `date-fns` | All arithmetic in local time, date-only |
-| BS calendar | `nepali-date-converter` | Display conversion only |
-| Charts | `react-native-gifted-charts` (+ `react-native-svg`) | |
-| Notifications | `expo-notifications` | Local scheduled only, never remote |
-| Secure storage | `expo-secure-store` | PIN hash only |
-| Safe areas | `react-native-safe-area-context` | Insets for status bar, notch, and gesture nav (§11.6) |
-| Gestures | `react-native-gesture-handler` | Calendar month swipe, day sheet drag |
-| Motion | `react-native-reanimated` | Short transitions only (§11.7) |
-| Build | EAS Build, `preview` profile producing an APK | |
-| Updates | `expo-updates` via EAS Update | JS changes ship OTA; native changes need a new APK |
+| Concern        | Choice                                              | Notes                                                        |
+| -------------- | --------------------------------------------------- | ------------------------------------------------------------ |
+| Framework      | Expo (managed workflow), latest stable SDK          |                                                              |
+| Language       | TypeScript, `strict: true`                          |                                                              |
+| Navigation     | `expo-router` with a bottom tab layout              |                                                              |
+| Local DB       | `expo-sqlite`                                       | Source of truth for all user data                            |
+| State          | `zustand`                                           | One store per domain; DB access only via repositories (§4.4) |
+| Dates          | `date-fns`                                          | All arithmetic in local time, date-only                      |
+| BS calendar    | `nepali-date-converter`                             | Display conversion only                                      |
+| Charts         | `react-native-gifted-charts` (+ `react-native-svg`) |                                                              |
+| Notifications  | `expo-notifications`                                | Local scheduled only, never remote                           |
+| Secure storage | `expo-secure-store`                                 | PIN hash only                                                |
+| Safe areas     | `react-native-safe-area-context`                    | Insets for status bar, notch, and gesture nav (§11.6)        |
+| Gestures       | `react-native-gesture-handler`                      | Calendar month swipe, day sheet drag                         |
+| Motion         | `react-native-reanimated`                           | Short transitions only (§11.7)                               |
+| Build          | EAS Build, `preview` profile producing an APK       |                                                              |
+| Updates        | `expo-updates` via EAS Update                       | JS changes ship OTA; native changes need a new APK           |
 
-Every library in this table is already installed. The M10 UX pass (§16) adds **no new dependency** — safe areas, gestures, motion, and the cycle ring all use packages Expo already pulls in.
+Most libraries in this table are installed. (In Sep 2026, unused libraries like `expo-notifications`, `expo-secure-store`, and `react-native-gifted-charts` were removed during an audit — add them back only if their features are actively built). The M10 UX pass (§16) adds **no new dependency** — safe areas, gestures, motion, and the cycle ring all use packages Expo already pulls in.
 
 ### Hard constraints
 
@@ -68,11 +73,11 @@ Every library in this table is already installed. The M10 UX pass (§16) adds **
 **Read before writing any code.** These definitions govern every calculation in the app.
 
 - **Cycle day 1** = the first day of a period.
-- **Cycle length** = number of days from one period's start to the next period's start. A cycle only exists once a *following* period has started.
+- **Cycle length** = number of days from one period's start to the next period's start. A cycle only exists once a _following_ period has started.
 - **Period length** = number of consecutive days of bleeding within one period.
 - **Ovulation (estimated)** = predicted next period start − 14 days (fixed luteal phase assumption). 14 days is the standard calendar-method figure — average luteal phase is 12–14 days ([Cleveland Clinic](https://my.clevelandclinic.org/health/articles/24417-luteal-phase)) and calendar predictors conventionally use 14 ([Mayo Clinic Press](https://mcpress.mayoclinic.org/pregnancy/finding-your-fertility-window/)).
 - **Fertile window (estimated)** = ovulation − 5 days through ovulation + 1 day — **7 days inclusive**. (Corrected 2026-08-31: this range was previously mislabeled "6 days inclusive" in this document; the code always computed 7. See DECISIONS.md.) This matches consumer clinical guidance of "5 days before ovulation, plus the day of, plus the day after" ([Hopkins Medicine](https://www.hopkinsmedicine.org/health/wellness-and-prevention/calculating-your-monthly-fertility-window)); ASRM's stricter committee-opinion figure is a 6-day window ending at ovulation with no day after ([ASRM 2022](https://www.asrm.org/practice-guidance/practice-committee-documents/optimizing-natural-fertility-a-committee-opinion-2021/)) — both appear in the literature, and this app uses the 7-day figure.
-- **Valid cycle length** = 21–45 days inclusive. Anything outside this is stored but excluded from averages (§5.3). This is a data-quality bound, not a clinical "normal" claim — ACOG's own definition of a *normal* cycle is 21–35 days ([Cleveland Clinic summarizing ACOG](https://my.clevelandclinic.org/health/diseases/14633-abnormal-menstruation-periods)), narrower than the app's 21–45. The wider band here exists so a real cycle outside the textbook range (common with PCOS or perimenopause) still contributes to the visible history — it is simply excluded from the *average*, not hidden.
+- **Valid cycle length** = 21–45 days inclusive. Anything outside this is stored but excluded from averages (§5.3). This is a data-quality bound, not a clinical "normal" claim — ACOG's own definition of a _normal_ cycle is 21–35 days ([Cleveland Clinic summarizing ACOG](https://my.clevelandclinic.org/health/diseases/14633-abnormal-menstruation-periods)), narrower than the app's 21–45. The wider band here exists so a real cycle outside the textbook range (common with PCOS or perimenopause) still contributes to the visible history — it is simply excluded from the _average_, not hidden.
 - **Valid period length** = 1–10 days inclusive.
 - All dates are stored as `YYYY-MM-DD` strings in **Gregorian**, in the device's local timezone. Bikram Sambat exists only at the presentation layer. **Never store a BS date.**
 - "Today" is computed once per render pass from local device time. Handle the app being left open across midnight by re-checking on app foreground.
@@ -118,38 +123,49 @@ CREATE TABLE settings (
 ```ts
 type FlowLevel = 'none' | 'spotting' | 'light' | 'medium' | 'heavy';
 
-type Mood = 'happy' | 'calm' | 'energetic' | 'sad' | 'anxious'
-          | 'irritable' | 'sensitive' | 'low_energy';
+type Mood =
+  'happy' | 'calm' | 'energetic' | 'sad' | 'anxious' | 'irritable' | 'sensitive' | 'low_energy';
 
-type Symptom = 'cramps' | 'headache' | 'backache' | 'bloating'
-             | 'breast_tenderness' | 'acne' | 'nausea' | 'fatigue'
-             | 'cravings' | 'constipation' | 'diarrhea' | 'insomnia'
-             | 'dizziness' | 'spotting_between';
+type Symptom =
+  | 'cramps'
+  | 'headache'
+  | 'backache'
+  | 'bloating'
+  | 'breast_tenderness'
+  | 'acne'
+  | 'nausea'
+  | 'fatigue'
+  | 'cravings'
+  | 'constipation'
+  | 'diarrhea'
+  | 'insomnia'
+  | 'dizziness'
+  | 'spotting_between';
 ```
 
 Enum values are stable identifiers. Display labels come from the string table (§12) — never render the raw enum value.
 
 ### 4.3 Settings keys and defaults
 
-| Key | Type | Default |
-|---|---|---|
-| `onboarding_complete` | boolean | `false` |
-| `birth_year` | number | — |
-| `reported_cycle_length` | number | `28` |
-| `reported_period_length` | number | `5` |
-| `calendar_system` | `'AD' \| 'BS'` | `'AD'` |
-| `pin_enabled` | boolean | `false` |
-| `notif_period_soon` | boolean | `true` |
-| `notif_period_soon_days` | number | `2` |
-| `notif_period_today` | boolean | `true` |
-| `notif_fertile_start` | boolean | `false` |
-| `notif_daily_log` | boolean | `false` |
-| `notif_daily_log_time` | `'HH:mm'` | `'20:00'` |
-| `schema_version` | number | `1` |
-| `irregular_notice_seen` | boolean | `false` |
-| `onboarding_seed_range` | JSON `{start,end}` or null | `null` |
-| `log_explainer_seen` | boolean | `false` |
-| `quick_log_enabled` | boolean | `true` |
+| Key                      | Type                       | Default   |
+| ------------------------ | -------------------------- | --------- |
+| `onboarding_complete`    | boolean                    | `false`   |
+| `birth_year`             | number                     | —         |
+| `reported_cycle_length`  | number                     | `28`      |
+| `reported_period_length` | number                     | `5`       |
+| `calendar_system`        | `'AD' \| 'BS'`             | `'AD'`    |
+| `pin_enabled`            | boolean                    | `false`   |
+| `notif_period_soon`      | boolean                    | `true`    |
+| `notif_period_soon_days` | number                     | `2`       |
+| `notif_period_today`     | boolean                    | `true`    |
+| `notif_fertile_start`    | boolean                    | `false`   |
+| `notif_daily_log`        | boolean                    | `false`   |
+| `notif_daily_log_time`   | `'HH:mm'`                  | `'20:00'` |
+| `schema_version`         | number                     | `1`       |
+| `irregular_notice_seen`  | boolean                    | `false`   |
+| `onboarding_seed_range`  | JSON `{start,end}` or null | `null`    |
+| `log_explainer_seen`     | boolean                    | `false`   |
+| `quick_log_enabled`      | boolean                    | `true`    |
 
 `onboarding_seed_range` records exactly which days onboarding seeded as flow. It exists so a later change to the last-period date (§6.7) can remove precisely those days instead of guessing which flow the user entered herself. `log_explainer_seen` gates the one-time explainer on the log screen (§6.4). `quick_log_enabled` hides the Home quick-log row (§6.2) for a user who does not want it.
 
@@ -182,17 +198,17 @@ Implement in `src/core/prediction.ts` as pure functions taking `Period[]` and `s
 type Confidence = 'low' | 'medium' | 'high';
 
 interface Prediction {
-  avgCycleLength: number;        // rounded, 21-45
-  avgPeriodLength: number;       // rounded, 1-10
-  nextPeriodStart: string;       // 'YYYY-MM-DD'
+  avgCycleLength: number; // rounded, 21-45
+  avgPeriodLength: number; // rounded, 1-10
+  nextPeriodStart: string; // 'YYYY-MM-DD'
   nextPeriodEnd: string;
-  predictionWindow: number;      // ± days of uncertainty (see 5.5)
+  predictionWindow: number; // ± days of uncertainty (see 5.5)
   ovulationDate: string;
   fertileStart: string;
   fertileEnd: string;
   confidence: Confidence;
   isIrregular: boolean;
-  cyclesUsed: number;            // how many real cycles fed the average
+  cyclesUsed: number; // how many real cycles fed the average
 }
 ```
 
@@ -214,13 +230,13 @@ Cycles marked `is_outlier` are excluded from the average entirely but still appe
 
 ### 5.4 Cold start
 
-| Non-outlier cycles available | Behaviour | Confidence |
-|---|---|---|
-| 0 | Use `reported_cycle_length` / `reported_period_length` from onboarding. Anchor to last period start given at onboarding. | `low` |
-| 1 | Blend: `round(0.5 × observed + 0.5 × reported)` | `low` |
-| 2–3 | Weighted average of observed only | `medium` |
-| 4+ and not irregular | Weighted average of observed only | `high` |
-| 4+ and irregular | Weighted average of observed only | `medium` |
+| Non-outlier cycles available | Behaviour                                                                                                                | Confidence |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| 0                            | Use `reported_cycle_length` / `reported_period_length` from onboarding. Anchor to last period start given at onboarding. | `low`      |
+| 1                            | Blend: `round(0.5 × observed + 0.5 × reported)`                                                                          | `low`      |
+| 2–3                          | Weighted average of observed only                                                                                        | `medium`   |
+| 4+ and not irregular         | Weighted average of observed only                                                                                        | `high`     |
+| 4+ and irregular             | Weighted average of observed only                                                                                        | `medium`   |
 
 ### 5.5 Irregularity detection
 
@@ -244,17 +260,21 @@ Also set `isIrregular = true` if any of the last 3 cycles was an outlier (outsid
 
 - The home screen shows a **range** ("around Oct 12–16") instead of a single date.
 - The fertile window card is rendered at reduced prominence with the text "less reliable when cycles vary".
-- A dismissible card appears once per irregular detection: neutral wording, no diagnosis, no condition names, no alarm. Copy: *"Your recent cycles have varied quite a bit. That's common, and it just means predictions here are rough estimates."* Nothing more.
+- A dismissible card appears once per irregular detection: neutral wording, no diagnosis, no condition names, no alarm. Copy: _"Your recent cycles have varied quite a bit. That's common, and it just means predictions here are rough estimates."_ Nothing more.
 - **Never** name a medical condition, never say "you should see a doctor", never suggest a cause. The app describes its own uncertainty, not the user's body.
 
 ### 5.7 Late periods
 
-If `today > nextPeriodStart` and no flow has been logged since:
+If `today > nextPeriodStart` and no flow has been logged since, tier by how many days past `nextPeriodStart` today is. The ring behaviour and exact copy for each tier are UI/UX spec §2.5 and §2.7 D–E.
 
-- Days 1–`predictionWindow` past: home shows "Expected around now".
-- Beyond that: "N days later than expected" with a neutral tone.
-- At 45 days since last period start: show a one-time card offering to reset the prediction anchor ("My cycle has changed — recalculate"), which simply forces the prediction to re-anchor on the last logged period.
+- **1 to `predictionWindow` days past** — "Expected around now". Ring renders normally.
+- **`predictionWindow`+1 to 7 days past** — "No period logged yet". The today-marker parks at the day-1 boundary; a dashed overflow arc on an outer radius grows one day at a time. On the 2nd day past `predictionWindow`, an inline prompt appears once: "Did your period start? [Yes, log it] [Not yet]".
+- **8+ days past** — "Predictions paused until you log your next period." The ring freezes; no countdown, no point estimate.
+- **60+ days since the last logged flow of any kind** — replace the home ring with one re-anchor card: "It's been a while. When did your last period start?". Do not accumulate phantom cycle days.
+- Never surface pregnancy, testing, or possible causes, in any tier.
 - **Never auto-log a period the user did not enter.**
+
+The former day-45 "My cycle has changed — recalculate" card is retired; the 8-day pause and the 60-day re-anchor card replace it.
 
 ### 5.8 Recalculation triggers
 
@@ -288,21 +308,15 @@ On finish: write settings, seed `daily_logs` with flow for the reported last per
 
 ### 6.2 Home
 
-Vertical scroll. In order:
+Single vertical priority stack (UI/UX spec §3). In order:
 
-1. **Status card** (the hero, ~40% of the first viewport)
-   - Large: days until next period ("Period in **6 days**"), or during a period "Day **3** of your period", or when late "**2 days** later than expected".
-   - Beneath: the predicted date, formatted per `calendar_system`, with `± window` shown as a range when window > 1.
-   - Cycle day indicator: "Cycle day 17".
-   - Confidence pill: `low` shows "estimate — keep logging"; `medium` and `high` show nothing. Only surface confidence when it's low enough to matter.
-2. **Primary action button** — context-aware:
-   - Not on a period → "Log today"
-   - No log for today and a period is expected → "My period started"
-   - On a period → "Log today"
-3. **Quick-log row** — at most five one-tap chips that write immediately without opening a modal: the flow level (when on a period) and the user's most-used recent symptoms. A tap **merges** into today's existing log — it never replaces mood, symptoms, or a note already saved for that day. Tapping a selected chip removes that value again. Hidden when `quick_log_enabled` is false.
-4. **This week strip** — 7 day-circles (3 before today, today, 3 after) each colour-coded by state (§11.2), tappable to open the log modal for that date.
-5. **Fertile window card** — dates, days-until, and the line: *"An estimate. Not reliable as birth control."* This line is not dismissible and is always present on this card.
-6. **Today's log summary** — if logged, a compact chip row of flow/mood/symptoms with an edit affordance; if not, an empty prompt.
+1. **Cycle ring** (the hero) — cycle-relative, never calendar-synced: ring day 1 is the first day of the current cycle at 12 o'clock, length = `avgCycleLength`. **No numerals on the rim.** Four layers: a phase band (menstruation / fertile / neutral luteal remainder), a single ovulation notch, a thin elapsed stroke on an inner radius, and the today-marker. Predicted arcs have feathered gradient ends; logged arcs are hard-edged. Centre shows at most three lines — eyebrow ("Cycle day 18"), a phase-dependent hero string (UI/UX spec §2.5 table), and a small chip ("estimate"). Geometry, uncertainty rendering, and edge cases (late, irregular, zero-data ghost ring) are UI/UX spec §2.3–2.7.
+2. **14-day linear strip** — horizontally scrollable, today at ~35% from the left. Per column: weekday, date, one status glyph, a small dot if a log exists. Tapping a column opens that day's log sheet. This is where exact dates live; it makes the ring's abstraction safe.
+3. **Primary action button** — "Log today", full-width, **sticky above the tab bar**. Label is context-aware: → "My period started" when a period is expected and today has no flow.
+4. **Quick-log row** — unchanged: at most five one-tap chips writing immediately without a modal, merge semantics (never replaces mood/symptoms/note already saved; tapping a selected chip removes that value). Hidden when `quick_log_enabled` is false.
+5. **One phase-aware context card** — a single card whose contents change by phase (menstruating / fertile / luteal / late / `loggedCycles < 3`). The fertile-phase variant carries the birth-control disclaimer _"An estimate. Not reliable as birth control."_ as a bordered callout — not dismissible, always present in that phase (UI/UX spec §3).
+
+The three separate stat cards (cycle day / next period / ovulation) are removed — cycle day is the ring eyebrow, next period is the hero, ovulation is on the ring and strip. Insights → Cycle overview (§6.5) stays the one place all values are listed together.
 
 ### 6.3 Calendar
 
@@ -319,7 +333,7 @@ Vertical scroll. In order:
 A bottom sheet for one tapped day, showing in order:
 
 1. The date in the active calendar system.
-2. One state line: period day *N*, predicted period, fertile window, ovulation estimate, or nothing predicted.
+2. One state line: period day _N_, predicted period, fertile window, ovulation estimate, or nothing predicted.
 3. What is already logged that day — flow, mood and symptom chips, note excerpt — or an empty prompt.
 4. **One-tap flow buttons**, writing immediately and merging like the quick-log row (§6.2).
 5. **Edit full log**, opening the log modal (§6.4) for that date.
@@ -349,11 +363,11 @@ Save and cancel in the header. Save writes `daily_logs`, triggers `recomputePeri
 Five sections, each in a card, in order:
 
 1. **Cycle overview** (M10) — the single glanceable summary: last period (dates + length), next period (date or range), ovulation date, fertile window (dates), and where today sits in the current cycle ("Cycle day N"). Every value is read straight from the `Period[]` / `Prediction` §5 already computes — no new calculation, just one clear place all of it is shown together, so a user does not have to piece it together from Home and the calendar. Low confidence shows the same "estimate — keep logging" note as Home.
-2. **Stats** — average cycle length, average period length, shortest and longest cycle, number of cycles tracked. When fewer than 2 cycles exist, show a "keep logging to see your patterns" state instead of zeros.
+2. **Stats** — average cycle length, average period length, number of cycles tracked (shortest/longest cycle stats were cut from the UI for brevity). When fewer than 2 cycles exist, show a "keep logging to see your patterns" state instead of zeros.
 3. **Charts**
-   - *Cycle length over time*: bar chart, one bar per completed cycle, most recent 12. Horizontal line at the user's average. Outlier bars in a muted colour.
-   - *Period length over time*: bar chart, same window.
-   - *Symptom frequency*: horizontal bars, top 6 symptoms by count over the last 90 days.
+   - _Cycle length over time_: bar chart, one bar per completed cycle, most recent 12. Horizontal line at the user's average. Outlier bars in a muted colour.
+   - _Period length over time_: bar chart, same window.
+   - _Symptom frequency_: horizontal bars, top 6 symptoms by count over the last 90 days.
    - Every chart needs an explicit empty state with the minimum data required stated ("needs at least 2 completed cycles").
 4. **Cycle history** — list, newest first: start date, end date, period length, cycle length, outlier badge. Tapping a row jumps the Calendar tab to that month.
 5. **Journal** — the readable record of what was logged, newest first, grouped by month. Each row: the date per `calendar_system`, a flow marker, mood and symptom chips, and the first line of any note. Tapping a row opens that day's log modal. Loads a page at a time rather than the whole history. Its empty state names what would appear here, so the section explains itself before there is any data in it.
@@ -388,7 +402,7 @@ Tone: calm, factual, non-clinical, no euphemisms. Written for an adult reader wh
 - Delete all data (double confirmation; the second dialog is a hold-to-confirm button)
 - About — version, and the full disclaimer text:
 
-> *"Saathi is a tracking tool, not a medical device. Predictions are estimates based on the dates you log. They are not reliable as contraception and are not medical advice."*
+> _"Saathi is a tracking tool, not a medical device. Predictions are estimates based on the dates you log. They are not reliable as contraception and are not medical advice."_
 
 **Changing the last period start date (the re-seed rule).** Editing this value is not a silent rewrite of history:
 
@@ -407,12 +421,12 @@ Editing typical cycle or period length writes settings only. It changes predicti
 
 All local, scheduled with `expo-notifications`. Android channel: name `Reminders`, importance default, no custom sound.
 
-| Setting | Timing | Title | Body |
-|---|---|---|---|
-| `notif_period_soon` | `notif_period_soon_days` before predicted start, 09:00 | `Reminder` | `Something's coming up in a few days.` |
-| `notif_period_today` | Predicted start date, 09:00 | `Reminder` | `Today's the day you're expecting.` |
-| `notif_fertile_start` | Fertile window start, 09:00 | `Reminder` | `Your window starts today.` |
-| `notif_daily_log` | Daily at `notif_daily_log_time` | `Reminder` | `A quick check-in when you have a moment.` |
+| Setting               | Timing                                                 | Title      | Body                                       |
+| --------------------- | ------------------------------------------------------ | ---------- | ------------------------------------------ |
+| `notif_period_soon`   | `notif_period_soon_days` before predicted start, 09:00 | `Reminder` | `Something's coming up in a few days.`     |
+| `notif_period_today`  | Predicted start date, 09:00                            | `Reminder` | `Today's the day you're expecting.`        |
+| `notif_fertile_start` | Fertile window start, 09:00                            | `Reminder` | `Your window starts today.`                |
+| `notif_daily_log`     | Daily at `notif_daily_log_time`                        | `Reminder` | `A quick check-in when you have a moment.` |
 
 The words "period", "cycle", "fertile", and the app name must not appear in any notification title or body. Someone glancing at the lock screen learns nothing.
 
@@ -468,28 +482,43 @@ The words "period", "cycle", "fertile", and the app name must not appear in any 
 
 ### 11.1 Direction
 
-Soft, conventional period-app aesthetic. Warm and calm, not clinical, not childish. Rounded corners (12–16px), generous whitespace, one accent colour used sparingly for emphasis rather than everywhere.
+Soft, conventional period-app aesthetic. Warm and calm, not clinical, not childish. Rounded corners (12–16px), generous whitespace, one accent colour used sparingly for emphasis rather than everywhere. Menstruation stays rose; fertility sits on the blue-violet axis, not green — the pink/green pair collapses under red-green colour blindness (UI/UX spec §2.8).
 
 ### 11.2 Palette
 
-| Token | Hex | Use |
-|---|---|---|
-| `bg` | `#FFF9FB` | App background |
-| `surface` | `#FFFFFF` | Cards |
-| `primary` | `#E8637C` | Period days, primary buttons |
-| `primaryMuted` | `#F0A0B6` | Predicted period days |
-| `fertile` | `#7FB3A8` | Fertile window (accent use, e.g. card text) |
-| `fertileMuted` | `#9FD0C2` | Fertile window fill |
-| `ovulation` | `#4E8D80` | Ovulation accent (non-fill uses) |
-| `ovulationFill` | `#3A6A5F` | Ovulation day-cell solid fill, paired with white text |
-| `text` | `#2E2A2C` | Primary text |
-| `textMuted` | `#7C7378` | Secondary text |
-| `border` | `#F0E4E8` | Dividers |
-| `warning` | `#D9A441` | Outlier / irregular markers |
+Adopted from UI/UX spec §2.8 (2026-09-06). Menstruation stays rose; fertility moved off green onto the blue-violet axis so the palette survives deuteranopia. The full token set — light and dark — lives in `src/theme/colors.ts`; `src/theme/palette.ts` resolves the active scheme and the colour-blind mode.
 
-**Day-cell states:** logged period (`primary` fill, white text), predicted period (`primaryMuted` fill), fertile (`fertileMuted` fill), ovulation (`ovulationFill` — solid, white text, same treatment as a logged period), today (2px `text` ring, layered over any other state), logged-but-no-flow (small `textMuted` dot). (Revised 2026-08-31 — ovulation previously shared `fertileMuted` with a thin ring; the ring was too subtle to read as informational at a glance, so ovulation now gets its own solid colour the way a logged period does. See DECISIONS.md.)
+| Token             | Light     | Dark      | Use                                     |
+| ----------------- | --------- | --------- | --------------------------------------- |
+| `bg`              | `#FFF9FB` | `#141013` | App background                          |
+| `surface`         | `#FFFFFF` | `#1E1A1C` | Cards                                   |
+| `periodLogged`    | `#D64C6E` | `#F1809B` | Logged period days, primary buttons     |
+| `periodPredicted` | `#F2A9BC` | `#8E5566` | Predicted period days (+ dashed border) |
+| `fertile`         | `#8B9DE8` | `#A8B6F0` | Fertile window fill / accent            |
+| `ovulation`       | `#4A5BAF` | `#7B8AD6` | Ovulation notch / day-cell fill         |
+| `neutralTrack`    | `#E8E1E3` | `#3A3335` | Ring luteal remainder, empty track      |
+| `todayMarker`     | `#1F1A1C` | `#FFFFFF` | Today marker / ring                     |
+| `text`            | `#2E2A2C` | `#F2EDEF` | Primary text                            |
+| `textMuted`       | `#7C7378` | `#A79DA2` | Secondary text                          |
+| `border`          | `#F0E4E8` | `#332D30` | Dividers                                |
+| `warning`         | `#D9A441` | `#E6B860` | Outlier / irregular markers             |
 
-Every fill/text pairing on this page is checked against WCAG AA (4.5:1) for the text colour it actually sits behind, not picked by eye — see the comment above the `colors` object in `src/theme/colors.ts`.
+`primary` is an alias of `periodLogged`. Any §2.8 value that fails its own contrast bar — 3:1 for non-text arcs against the card background, 4.5:1 for ring-centre text (WCAG 1.4.11 / 1.4.3) — is darkened minimally within its hue and recorded in `DECISIONS.md` and the `colors.ts` header comment, as was already done for `ovulationFill`.
+
+**Colour is never the only carrier of meaning.** Every state also carries at least two of: hue, luminance, texture, glyph.
+
+| State            | Hue        | Fill  | Texture       | Glyph           |
+| ---------------- | ---------- | ----- | ------------- | --------------- |
+| Logged period    | Rose       | Solid | —             | Droplet         |
+| Predicted period | Rose       | 40%   | Dashed border | Droplet outline |
+| Fertile          | Periwinkle | 25%   | —             | —               |
+| Ovulation        | Indigo     | Solid | —             | Small diamond   |
+| Logged, no flow  | Neutral    | None  | —             | Small dot       |
+| Today            | —          | None  | 2dp ring      | —               |
+
+A **Colour-blind friendly** toggle (`color_blind_mode` setting) swaps to a monochrome + glyph scheme.
+
+Dark-theme wiring lands in M13; until then only the light column is active, but both columns exist as tokens so the switch stays a single-file change (§11.5).
 
 Colour must never be the only carrier of meaning — every state also has a shape, ring, or dot.
 
@@ -506,7 +535,7 @@ System font. Scale: 34 (hero number), 24 (screen title), 18 (card title), 15 (bo
 
 ### 11.5 Dark mode
 
-Not in v1. But define all colours as tokens in `src/theme/colors.ts` so a dark palette is a single-file addition later.
+Full dark theme lands in M13 (UI/UX spec §10 — "health apps get opened at 2am"). Both palette columns already exist as tokens in `src/theme/colors.ts`; M13 wires the scheme switch and honours the OS setting — it does not pick new colours.
 
 ### 11.6 Layout and safe areas
 
@@ -595,6 +624,7 @@ src/
 Jest with `@testing-library/react-native`. The following must have unit tests before the feature is considered done:
 
 **`prediction.ts`**
+
 - Weighted average correctness
 - Clamping at 21 and 45
 - Each cold-start tier (0, 1, 2–3, 4+ cycles)
@@ -603,25 +633,30 @@ Jest with `@testing-library/react-native`. The following must have unit tests be
 - Late-period states at day 1, day `window`, day `window+1`, day 45
 
 **`periods.ts`**
+
 - Run grouping with gaps of 0, 1, 2, and 3 days
 - Single-day periods
 - A period at the very start and very end of the dataset
 - Outlier flagging at 20, 21, 45, 46 days
 
 **`calendar.ts`**
+
 - Known AD↔BS date pairs, including a BS month with 32 days
 - `currentBsYear` / `currentBsMonth` against known dates — the calendar's opening month depends on them (§6.3)
 
 **`onboarding.ts`** (M10)
+
 - Numeric input parsing: empty, non-numeric, below range, above range, valid
 - Quick date choices resolve to the right ISO dates for a given `today`
 - Re-seed planning: days carrying mood/symptom/note are excluded from the clear list; the new seed range is correct at period lengths 1 and 10
 
 **`quickLog.ts`** (M10)
+
 - A quick toggle merges into an existing log and never drops moods, symptoms, or a note
 - Tapping a selected chip removes only that value
 
 **`journal.ts`** (M10)
+
 - Month grouping is newest-first in both AD and BS, and a month boundary falls where the active system says it does
 
 **Fixtures.** Provide `scripts/seed.ts` generating three datasets:
@@ -666,19 +701,24 @@ v1 is done when all of these are true:
 
 Full detail in `BUILD_PLAN.md`. Summary:
 
-| Milestone | Contents |
-|---|---|
-| **M0** | Expo + TS + expo-router scaffold, theme tokens, i18n file, tab shell |
-| **M1** | SQLite client, schema, migration runner, repositories, seed script |
-| **M2** | `periods.ts` and `prediction.ts` as pure modules **with unit tests passing** |
-| **M3** | Onboarding flow, writing real settings and seed logs |
-| **M4** | Home (status card, week strip, fertile card) + log modal end-to-end |
-| **M5** | Calendar with AD/BS toggle |
-| **M6** | Insights: stats, three charts, cycle history |
-| **M7** | Settings, notifications, PIN lock, export, delete-all |
-| **M8** | Learn articles |
-| **M9** | Edge cases (§10), accessibility pass, EAS APK build, expo-updates wiring |
-| **M10** | UX pass: safe areas (§11.6), onboarding input + editable profile (§6.1, §6.7), calendar day sheet and swipe (§6.3), Home quick-log (§6.2), log reframe (§6.4), journal + cycle overview (§6.5), motion (§11.7) |
+| Milestone | Contents                                                                                                                                                                                                       |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **M0**    | Expo + TS + expo-router scaffold, theme tokens, i18n file, tab shell                                                                                                                                           |
+| **M1**    | SQLite client, schema, migration runner, repositories, seed script                                                                                                                                             |
+| **M2**    | `periods.ts` and `prediction.ts` as pure modules **with unit tests passing**                                                                                                                                   |
+| **M3**    | Onboarding flow, writing real settings and seed logs                                                                                                                                                           |
+| **M4**    | Home (status card, week strip, fertile card) + log modal end-to-end                                                                                                                                            |
+| **M5**    | Calendar with AD/BS toggle                                                                                                                                                                                     |
+| **M6**    | Insights: stats, three charts, cycle history                                                                                                                                                                   |
+| **M7**    | Settings, notifications, PIN lock, export, delete-all                                                                                                                                                          |
+| **M8**    | Learn articles                                                                                                                                                                                                 |
+| **M9**    | Edge cases (§10), accessibility pass, EAS APK build, expo-updates wiring                                                                                                                                       |
+| **M10**   | UX pass: safe areas (§11.6), onboarding input + editable profile (§6.1, §6.7), calendar day sheet and swipe (§6.3), Home quick-log (§6.2), log reframe (§6.4), journal + cycle overview (§6.5), motion (§11.7) |
+| **M11**   | UI/UX rebuild sprint 1 (P0, trust): cycle-relative ring with no numerals, 14-day linear strip, phase-aware hero + one date model, blue-violet palette + texture grammar + colour-blind mode, calendar legend 3-up, notifications section hidden, UTC+05:45 date-storage audit. UI/UX spec §2–4, §11.4, §13 |
+| **M12**   | UI/UX rebuild sprint 2 (P1, comprehension): full log bottom sheet (§6), Insights cycle-history bar chart + statistics block (§5 — the never-built M6), privacy-first onboarding pass (§8), TalkBack + 200% font scaling (§10), single-commit settings + complete Data section (§7), `src/core/` purity confirmation (§11.3). UI/UX spec §5–10, §13 |
+| **M13**   | UI/UX rebuild sprint 3 (P2): symptom heat strip (§5), dark-theme wiring (§2.8, §10), PDF export (§5 — needs `expo-print` + `expo-sharing`, ask first), calendar cycle bands + jump-to-month (§4), haptics + micro-interactions + empty states (§12 — needs `expo-haptics`, ask first). UI/UX spec §5, §10, §12, §13 |
+
+M11–M13 replace the UI/UX-facing scope of the never-completed M6 (Insights charts) and part of M7 (settings polish). Notifications and the PIN lock stay deferred M7 scope — see `BUILD_PLAN.md` §6c.
 
 M2 before M4 is deliberate — the prediction logic is the product, and it should be correct in isolation before any screen depends on it.
 

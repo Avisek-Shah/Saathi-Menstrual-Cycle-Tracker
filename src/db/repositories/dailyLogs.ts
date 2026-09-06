@@ -1,6 +1,8 @@
+import type { SQLiteDatabase } from 'expo-sqlite';
+
 import { recomputePeriods } from '../../core/periods';
 import { openDB } from '../client';
-import { replaceAllPeriods } from './periods';
+import { replaceAllPeriodsInTx } from './periods';
 
 export interface LogRow {
   date: string;
@@ -39,14 +41,19 @@ function toLogRow(row: RawLogRow): LogRow {
 
 /**
  * Rebuild the derived `periods` table from every flow day (§4.4 — every write that touches
- * flow re-runs this).
+ * flow re-runs this). Takes the already-open `db` and does not open its own transaction, so
+ * callers compose it inside the one transaction that also covers their `daily_logs` write —
+ * expo-sqlite doesn't support nested transactions, and `periods` must never observe a
+ * `daily_logs` write that a later failure rolls back.
  */
-async function refreshPeriods(): Promise<void> {
-  const db = await openDB();
+async function refreshPeriodsInTx(db: SQLiteDatabase): Promise<void> {
+  // `recomputePeriods` (core/periods.ts) already discards flow === 'none' rows itself, so
+  // filtering here is provably the same input set — it just does it in the index instead of
+  // in JS, and makes `idx_daily_logs_flow` (schema.ts) a used index rather than a dead one.
   const rows = await db.getAllAsync<{ date: string; flow: string }>(
-    'SELECT date, flow FROM daily_logs ORDER BY date ASC',
+    "SELECT date, flow FROM daily_logs WHERE flow != 'none' ORDER BY date ASC",
   );
-  await replaceAllPeriods(recomputePeriods(rows));
+  await replaceAllPeriodsInTx(db, recomputePeriods(rows));
 }
 
 export async function getByDate(date: string): Promise<LogRow | null> {
@@ -72,6 +79,49 @@ export async function getAll(): Promise<LogRow[]> {
   return rows.map(toLogRow);
 }
 
+export interface UpsertLogInput {
+  date: string;
+  flow: string;
+  moods: string[];
+  symptoms: string[];
+  note?: string | null;
+}
+
+/**
+ * Write several `daily_logs` rows and rebuild `periods` exactly once, in one transaction.
+ * Prefer this over calling `upsert` in a loop whenever more than one date is being written
+ * together (onboarding seed, §6.7 anchor change) — `upsert` alone opens its own transaction
+ * and rebuilds `periods` from scratch every time, so N calls cost N full rebuilds instead
+ * of one.
+ */
+export async function upsertMany(entries: readonly UpsertLogInput[]): Promise<void> {
+  if (entries.length === 0) return;
+  const db = await openDB();
+  const now = Date.now();
+  await db.withTransactionAsync(async () => {
+    for (const entry of entries) {
+      await db.runAsync(
+        `INSERT INTO daily_logs (date, flow, moods, symptoms, note, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(date) DO UPDATE SET
+           flow = excluded.flow,
+           moods = excluded.moods,
+           symptoms = excluded.symptoms,
+           note = excluded.note,
+           updated_at = excluded.updated_at`,
+        entry.date,
+        entry.flow,
+        JSON.stringify(entry.moods),
+        JSON.stringify(entry.symptoms),
+        entry.note ?? null,
+        now,
+        now,
+      );
+    }
+    await refreshPeriodsInTx(db);
+  });
+}
+
 export async function upsert(
   date: string,
   flow: string,
@@ -79,39 +129,24 @@ export async function upsert(
   symptoms: string[],
   note?: string | null,
 ): Promise<void> {
-  const db = await openDB();
-  const now = Date.now();
-  await db.runAsync(
-    `INSERT INTO daily_logs (date, flow, moods, symptoms, note, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(date) DO UPDATE SET
-       flow = excluded.flow,
-       moods = excluded.moods,
-       symptoms = excluded.symptoms,
-       note = excluded.note,
-       updated_at = excluded.updated_at`,
-    date,
-    flow,
-    JSON.stringify(moods),
-    JSON.stringify(symptoms),
-    note ?? null,
-    now,
-    now,
-  );
-  await refreshPeriods();
+  await upsertMany([{ date, flow, moods, symptoms, note }]);
 }
 
 export async function deleteByDate(date: string): Promise<void> {
   const db = await openDB();
-  await db.runAsync('DELETE FROM daily_logs WHERE date = ?', date);
-  await refreshPeriods();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM daily_logs WHERE date = ?', date);
+    await refreshPeriodsInTx(db);
+  });
 }
 
 /** Wipe every log (delete-all-data, §6.7). Also clears the derived periods. */
 export async function deleteAll(): Promise<void> {
   const db = await openDB();
-  await db.runAsync('DELETE FROM daily_logs');
-  await refreshPeriods();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('DELETE FROM daily_logs');
+    await refreshPeriodsInTx(db);
+  });
 }
 
 /**
@@ -146,8 +181,8 @@ export async function clearFlowForDates(dates: readonly string[]): Promise<void>
         );
       }
     }
+    await refreshPeriodsInTx(db);
   });
-  await refreshPeriods();
 }
 
 /**
@@ -162,9 +197,6 @@ export async function getRecent(limit: number, before?: string): Promise<LogRow[
         before,
         limit,
       )
-    : await db.getAllAsync<RawLogRow>(
-        'SELECT * FROM daily_logs ORDER BY date DESC LIMIT ?',
-        limit,
-      );
+    : await db.getAllAsync<RawLogRow>('SELECT * FROM daily_logs ORDER BY date DESC LIMIT ?', limit);
   return rows.map(toLogRow);
 }

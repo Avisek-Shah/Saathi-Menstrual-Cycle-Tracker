@@ -39,7 +39,8 @@ function stateLine(dateIso: string, periods: Period[], prediction: Prediction): 
   const period = currentPeriod(periods, dateIso);
   if (period) return fill(en.dayStatePeriodDay, { n: periodDay(period.start_date, dateIso) });
   if (dateIso === prediction.ovulationDate) return en.futureOvulation;
-  if (dateIso >= prediction.fertileStart && dateIso <= prediction.fertileEnd) return en.futureFertile;
+  if (dateIso >= prediction.fertileStart && dateIso <= prediction.fertileEnd)
+    return en.futureFertile;
   if (dateIso >= prediction.nextPeriodStart && dateIso <= prediction.nextPeriodEnd) {
     return en.futurePredictedPeriod;
   }
@@ -66,7 +67,9 @@ export function DaySheet({
   if (!dateIso) return null;
 
   const isFuture = dateIso > today;
-  const hasAnything = log !== null && (log.flow !== 'none' || log.moods.length > 0 || log.symptoms.length > 0 || log.note);
+  const hasAnything =
+    log !== null &&
+    (log.flow !== 'none' || log.moods.length > 0 || log.symptoms.length > 0 || log.note);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -99,7 +102,12 @@ export function DaySheet({
             <Text style={{ ...typography.cardTitle, color: colors.text }}>
               {formatDate(dateIso, system)}
             </Text>
-            <Pressable accessibilityRole="button" accessibilityLabel={en.close} onPress={onClose} hitSlop={8}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={en.close}
+              onPress={onClose}
+              hitSlop={8}
+            >
               <Text style={{ ...typography.body, color: colors.textMuted }}>{en.close}</Text>
             </Pressable>
           </View>
@@ -110,22 +118,38 @@ export function DaySheet({
             </Text>
 
             {isFuture ? (
-              <Text style={{ ...typography.body, color: colors.textMuted }}>{en.logFutureBlocked}</Text>
+              <Text style={{ ...typography.body, color: colors.textMuted }}>
+                {en.logFutureBlocked}
+              </Text>
             ) : (
               <>
                 {hasAnything ? (
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
                     {log && log.flow !== 'none' ? (
-                      <Chip label={flowLabel(log.flow as FlowLevel)} selected onPress={() => undefined} />
+                      <Chip
+                        label={flowLabel(log.flow as FlowLevel)}
+                        selected
+                        onPress={() => undefined}
+                      />
                     ) : null}
                     {/* `LogRow` stores raw strings from the DB; every value it holds was
                         written through the log modal's enum-typed chips, so this cast just
                         recovers the type the write side already guaranteed. */}
                     {log?.moods.map((m) => (
-                      <Chip key={m} label={moodLabel(m as Mood)} selected onPress={() => undefined} />
+                      <Chip
+                        key={m}
+                        label={moodLabel(m as Mood)}
+                        selected
+                        onPress={() => undefined}
+                      />
                     ))}
                     {log?.symptoms.map((s) => (
-                      <Chip key={s} label={symptomLabel(s as Symptom)} selected onPress={() => undefined} />
+                      <Chip
+                        key={s}
+                        label={symptomLabel(s as Symptom)}
+                        selected
+                        onPress={() => undefined}
+                      />
                     ))}
                   </View>
                 ) : (
@@ -155,7 +179,14 @@ export function DaySheet({
                           backgroundColor: selected ? colors.primaryMuted : colors.surface,
                         }}
                       >
-                        <Text style={{ ...typography.caption, color: colors.text }}>{flowLabel(level)}</Text>
+                        <Text
+                          style={{
+                            ...typography.caption,
+                            color: selected ? colors.onPrimaryMuted : colors.text,
+                          }}
+                        >
+                          {flowLabel(level)}
+                        </Text>
                       </Pressable>
                     );
                   })}
@@ -166,7 +197,9 @@ export function DaySheet({
                   onPress={onEditFull}
                   style={{ minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' }}
                 >
-                  <Text style={{ ...typography.body, color: colors.primary }}>{en.daySheetEditFull}</Text>
+                  <Text style={{ ...typography.body, color: colors.primary }}>
+                    {en.daySheetEditFull}
+                  </Text>
                 </Pressable>
               </>
             )}

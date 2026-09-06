@@ -19,6 +19,24 @@ export const en = {
   cycleDay: 'Cycle day {day}',
   confidenceEstimate: 'estimate — keep logging',
 
+  // Cycle ring centre — phase-aware hero (§2.5 table) + chip. {n}/{total}/{days}/{a}/{b}/{date}
+  // filled via `fill`. Late-period wording is §5.7 / §2.7 D–E sensitive — do not edit without
+  // that review.
+  ringHeroFertile: 'Fertile window · day {n} of {total}',
+  ringHeroOvulation: 'Ovulation likely today',
+  ringHeroApprox: 'Period in ~{days} days',
+  ringHeroApproxOne: 'Period in ~1 day',
+  ringHeroExpectedRange: 'Period expected {a} – {b}',
+  ringHeroNoPeriodYet: 'No period logged yet',
+  ringHeroPaused: 'Predictions paused',
+  ringHeroLongGap: "It's been a while",
+  ringHeroNoData: 'Log your period to start',
+  ringDateAround: 'around {date}',
+  ringChipFromYou: 'estimate — from what you told us',
+  ringToggleHint: 'Shows the predicted date',
+  ringA11yKnown: 'Cycle day {day} of about {length}. {hero}. This is an estimate.',
+  ringA11yNoData: 'No period logged yet. Add your last period to see predictions.',
+
   today: 'Today',
   history: 'History',
 
@@ -37,7 +55,6 @@ export const en = {
   insightsDays: '{n} days',
   insightsCyclesUsed: 'Based on {n} cycles',
   settingsCalendarSystem: 'Calendar system',
-  settingsNotifications: 'Notifications',
 
   // Insights → Cycle overview (§6.5, M10) — the single glanceable summary the user asked for:
   // last period, next period, ovulation, fertile window, cycle day, all in one place.
@@ -60,19 +77,18 @@ export const en = {
   settingsAppSection: 'App',
   settingsAppLock: 'App lock',
   settingsQuickLog: 'Quick-log on Home',
+  settingsColorBlind: 'Colour-blind friendly',
   settingsDataSection: 'Data',
   settingsExportData: 'Export data',
   settingsDeleteAllData: 'Delete all data',
   settingsAboutSection: 'About',
   settingsNotBuiltYet: 'Not available yet',
   settingsVersion: 'Version {version}',
+  settingsVersionUnknown: 'Version unavailable',
   settingsOn: 'On',
   settingsOff: 'Off',
-  settingsNotifPeriodSoon: 'Period reminder',
-  settingsNotifPeriodToday: 'Day-of reminder',
-  settingsNotifFertileStart: 'Fertile window reminder',
-  settingsNotifDailyLog: 'Daily check-in reminder',
-  settingsNotifCaption: 'Saved now; scheduled reminders arrive with a later update.',
+  // Notification setting labels removed in M11 — the section is hidden until M7 wires
+  // expo-notifications (BUILD_PLAN §6c). The `notif_*` settings keys themselves stay (§4.3).
 
   // Settings → My cycle (§6.7).
   profileTitle: 'My cycle',
@@ -94,8 +110,10 @@ export const en = {
 
   // Onboarding (§6.1). {n} filled via `fill`.
   onboardingWelcomeTitle: 'Saathi',
-  onboardingWelcomeWhat: 'Track your cycle, and see when your next period and fertile window are likely.',
-  onboardingWelcomePrivacy: 'Everything you enter stays on this phone. There is no account and nothing is sent anywhere.',
+  onboardingWelcomeWhat:
+    'Track your cycle, and see when your next period and fertile window are likely.',
+  onboardingWelcomePrivacy:
+    'Everything you enter stays on this phone. There is no account and nothing is sent anywhere.',
   onboardingStartTitle: 'When did your last period start?',
   onboardingStartHelp: 'Pick the day the bleeding began, or type it in.',
   onboardingStartNotSure: "I'm not sure",
@@ -107,13 +125,16 @@ export const en = {
   onboardingPickDate: 'Pick a date',
   onboardingHideDate: 'Hide date picker',
   onboardingCycleTitle: 'How long is your typical cycle?',
-  onboardingCycleHelp: 'Count from the first day of one period to the first day of the next. Most are 24 to 35 days. Type it in, or choose a number below.',
+  onboardingCycleHelp:
+    'Count from the first day of one period to the first day of the next. Most are 24 to 35 days. Type it in, or choose a number below.',
   onboardingCycleUnit: '{n} days',
   onboardingDontKnow: "I don't know",
   onboardingPeriodTitle: 'How many days does your period usually last?',
-  onboardingPeriodHelp: 'Count the days you have any bleeding. Type it in, or choose a number below.',
+  onboardingPeriodHelp:
+    'Count the days you have any bleeding. Type it in, or choose a number below.',
   onboardingBirthYearTitle: 'Which year were you born?',
-  onboardingBirthYearHelp: 'Used only to tailor a few tips. It is never shown back as your age. Type it in, or choose a year below.',
+  onboardingBirthYearHelp:
+    'Used only to tailor a few tips. It is never shown back as your age. Type it in, or choose a year below.',
   onboardingBack: 'Back',
   onboardingNext: 'Next',
   onboardingSkip: 'Skip',
@@ -139,10 +160,13 @@ export const en = {
   irregularNoticeBody:
     "Your recent cycles have varied quite a bit. That's common, and it just means predictions here are rough estimates.",
   dismiss: 'Dismiss',
-  // §5.7 day-45 card.
-  recalcTitle: 'My cycle has changed — recalculate',
-  recalcBody: 'Re-anchor the prediction on your most recent period.',
-  recalcAction: 'Recalculate',
+  // §2.7 D inline prompt — appears from the 2nd day a period is unlogged past the window.
+  startPromptQuestion: 'Did your period start?',
+  startPromptYes: 'Yes, log it',
+  startPromptNo: 'Not yet',
+  // §2.7 E — one re-anchor card after a long silence. Do not edit without §5.7 review.
+  longGapBody: "It's been a while. When did your last period start?",
+  longGapAction: 'Update last period',
 
   // Log modal (§6.4).
   logHeaderQuestion: 'How was today?',
@@ -198,12 +222,10 @@ export const en = {
   symptom_spotting_between: 'Spotting between periods',
 
   // Calendar (§6.3). Legend labels mirror the §11.2 day-cell states.
-  legendPeriod: 'Period',
-  legendPredicted: 'Predicted',
-  legendFertile: 'Fertile',
-  legendOvulation: 'Ovulation',
-  legendLogged: 'Log (no flow)',
-  legendToday: 'Today',
+  // §4 (A2) — three legend entries; the texture grammar carries logged-vs-predicted.
+  legendPeriod: 'Period (logged / predicted)',
+  legendFertile: 'Fertile window',
+  legendLogged: 'Logged',
   calendarPrevMonth: 'Previous month',
   calendarNextMonth: 'Next month',
   // Visible glyphs for the prev/next month controls — accessibilityLabel carries the real

@@ -22,19 +22,25 @@ export async function runMigrations(db: SQLiteDatabase): Promise<void> {
   );
   const current = row ? Number(row.value) : 0;
 
-  if (current < 1) {
-    await db.execAsync(CREATE_DAILY_LOGS);
-    await db.execAsync(IDX_FLOW);
-    await db.execAsync(CREATE_PERIODS);
-  }
+  if (current >= SCHEMA_VERSION) return;
 
-  // if (current < 2) { ...structural changes for v2... }
+  // Every version block plus the version write is one transaction: v1's statements are all
+  // idempotent `CREATE ... IF NOT EXISTS` so this is currently belt-and-braces, but the
+  // `if (current < 2)` seam below won't be — a crash mid-migration must not leave
+  // `schema_version` behind half-applied DDL.
+  await db.withTransactionAsync(async () => {
+    if (current < 1) {
+      await db.execAsync(CREATE_DAILY_LOGS);
+      await db.execAsync(IDX_FLOW);
+      await db.execAsync(CREATE_PERIODS);
+    }
 
-  if (current < SCHEMA_VERSION) {
+    // if (current < 2) { ...structural changes for v2... }
+
     await db.runAsync(
       "INSERT INTO settings (key, value) VALUES ('schema_version', ?) " +
         'ON CONFLICT(key) DO UPDATE SET value = excluded.value',
       String(SCHEMA_VERSION),
     );
-  }
+  });
 }

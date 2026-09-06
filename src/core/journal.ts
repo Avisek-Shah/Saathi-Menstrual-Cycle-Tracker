@@ -48,7 +48,10 @@ export function summariseEntry(row: JournalRow): JournalEntry {
  * §6.5 — group rows newest-first by month, in the active calendar system. The group key is
  * the AD month for stable sorting (§3 — storage stays Gregorian); the label is localized.
  */
-export function groupByMonth(rows: readonly JournalRow[], system: CalendarSystem): JournalMonthGroup[] {
+export function groupByMonth(
+  rows: readonly JournalRow[],
+  system: CalendarSystem,
+): JournalMonthGroup[] {
   const sorted = [...rows].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   const groups: JournalMonthGroup[] = [];
   const byKey = new Map<string, JournalMonthGroup>();

@@ -96,7 +96,11 @@ export function reseedPlan(
   newStart: string,
   periodLength: number,
   protectedDates: readonly string[] = [],
-): { clear: string[]; seed: { date: string; flow: string }[]; range: { start: string; end: string } } {
+): {
+  clear: string[];
+  seed: { date: string; flow: string }[];
+  range: { start: string; end: string };
+} {
   const seed = firstPeriodSeedLogs(newStart, periodLength);
   const range = { start: newStart, end: seed[seed.length - 1].date };
   const protectedSet = new Set(protectedDates);
@@ -153,7 +157,10 @@ export function birthYearQuickChoices(
 ): number[] {
   return ages
     .map((age) => currentYear - age)
-    .filter((year) => year >= currentYear - BIRTH_YEAR_MAX_AGE && year <= currentYear - BIRTH_YEAR_MIN_AGE);
+    .filter(
+      (year) =>
+        year >= currentYear - BIRTH_YEAR_MAX_AGE && year <= currentYear - BIRTH_YEAR_MIN_AGE,
+    );
 }
 
 /** §6.1 step 5 — years from `currentYear − 9` down to `currentYear − 60`. */
@@ -179,8 +186,7 @@ export function resolveOnboarding(input: OnboardingInput, today: string): Onboar
     PERIOD_LENGTH_MIN,
     PERIOD_LENGTH_MAX,
   );
-  const anchorDate =
-    input.lastPeriodStart ?? notSureAnchor(today, reported_cycle_length);
+  const anchorDate = input.lastPeriodStart ?? notSureAnchor(today, reported_cycle_length);
 
   return {
     settings: {

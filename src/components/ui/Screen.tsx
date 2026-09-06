@@ -84,8 +84,9 @@ export function Screen({
           style={{
             paddingHorizontal: spacing.lg,
             paddingTop: spacing.md,
-            // §11.6 — the gesture bar is occupied space, never something to draw a button into.
-            paddingBottom: insets.bottom + spacing.lg,
+            // On a tab screen the tab bar below already clears the gesture area (§11.6); a
+            // standalone screen using this slot should pass its own bottom spacing in.
+            paddingBottom: spacing.md,
             borderTopWidth: 1,
             borderTopColor: colors.border,
             backgroundColor: colors.bg,

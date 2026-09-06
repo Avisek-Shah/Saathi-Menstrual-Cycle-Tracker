@@ -59,9 +59,16 @@ export function NumberAnswerField({
         </View>
       </View>
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
+      <View
+        style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}
+      >
         {choices.map((n) => (
-          <Chip key={n} label={String(n)} selected={value === n} onPress={() => onChangeText(String(n))} />
+          <Chip
+            key={n}
+            label={String(n)}
+            selected={value === n}
+            onPress={() => onChangeText(String(n))}
+          />
         ))}
       </View>
 

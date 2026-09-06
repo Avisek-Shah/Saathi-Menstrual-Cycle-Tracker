@@ -124,8 +124,9 @@ describe('getMonthGrid (BS) — §9 re-gridding, not relabelling', () => {
   });
 
   it('BS month lengths vary (29–32), unlike a relabelled Gregorian grid', () => {
-    const lengths = Array.from({ length: 12 }, (_, i) =>
-      getMonthGrid(2083, i + 1, 'BS', '2026-08-31').cells.filter((c) => !c.fill).length,
+    const lengths = Array.from(
+      { length: 12 },
+      (_, i) => getMonthGrid(2083, i + 1, 'BS', '2026-08-31').cells.filter((c) => !c.fill).length,
     );
     expect(lengths).toEqual([31, 31, 32, 31, 31, 31, 30, 29, 30, 29, 30, 30]);
     expect(Math.min(...lengths)).toBeGreaterThanOrEqual(29);

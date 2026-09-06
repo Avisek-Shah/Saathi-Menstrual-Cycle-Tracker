@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { Pressable, Switch, Text, View } from 'react-native';
 
@@ -37,7 +38,9 @@ function NavRow({ label, value, onPress }: { label: string; value?: string; onPr
       }}
     >
       <Text style={{ ...typography.body, color: colors.text }}>{label}</Text>
-      {value ? <Text style={{ ...typography.caption, color: colors.textMuted }}>{value}</Text> : null}
+      {value ? (
+        <Text style={{ ...typography.caption, color: colors.textMuted }}>{value}</Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -83,7 +86,9 @@ function DisabledRow({ label }: { label: string }) {
       }}
     >
       <Text style={{ ...typography.body, color: colors.text }}>{label}</Text>
-      <Text style={{ ...typography.caption, color: colors.textMuted }}>{en.settingsNotBuiltYet}</Text>
+      <Text style={{ ...typography.caption, color: colors.textMuted }}>
+        {en.settingsNotBuiltYet}
+      </Text>
     </View>
   );
 }
@@ -102,10 +107,7 @@ export default function SettingsScreen() {
       <View>
         <SectionLabel label={en.settingsMyCycleSection} />
         <Card>
-          <NavRow
-            label={en.settingsMyCycleRow}
-            onPress={() => router.push('/settings/profile')}
-          />
+          <NavRow label={en.settingsMyCycleRow} onPress={() => router.push('/settings/profile')} />
           <Divider />
           <NavRow
             label={en.settingsCalendarSystem}
@@ -117,37 +119,9 @@ export default function SettingsScreen() {
         </Card>
       </View>
 
-      <View>
-        <SectionLabel label={en.settingsNotifications} />
-        <Card style={{ gap: spacing.sm }}>
-          <ToggleRow
-            label={en.settingsNotifPeriodSoon}
-            value={settings.notif_period_soon}
-            onChange={(v) => update({ notif_period_soon: v })}
-          />
-          <Divider />
-          <ToggleRow
-            label={en.settingsNotifPeriodToday}
-            value={settings.notif_period_today}
-            onChange={(v) => update({ notif_period_today: v })}
-          />
-          <Divider />
-          <ToggleRow
-            label={en.settingsNotifFertileStart}
-            value={settings.notif_fertile_start}
-            onChange={(v) => update({ notif_fertile_start: v })}
-          />
-          <Divider />
-          <ToggleRow
-            label={en.settingsNotifDailyLog}
-            value={settings.notif_daily_log}
-            onChange={(v) => update({ notif_daily_log: v })}
-          />
-          <Text style={{ ...typography.caption, color: colors.textMuted, marginTop: spacing.xs }}>
-            {en.settingsNotifCaption}
-          </Text>
-        </Card>
-      </View>
+      {/* Notifications are hidden until M7 wires expo-notifications — a toggle that animates
+          to "on" and does nothing is the worst pattern in the app (UI/UX spec §7, user
+          choice 2026-09-06). See BUILD_PLAN §6c. */}
 
       <View>
         <SectionLabel label={en.settingsAppSection} />
@@ -156,6 +130,12 @@ export default function SettingsScreen() {
             label={en.settingsQuickLog}
             value={settings.quick_log_enabled}
             onChange={(v) => update({ quick_log_enabled: v })}
+          />
+          <Divider />
+          <ToggleRow
+            label={en.settingsColorBlind}
+            value={settings.color_blind_mode}
+            onChange={(v) => update({ color_blind_mode: v })}
           />
           <Divider />
           <DisabledRow label={en.settingsAppLock} />
@@ -175,7 +155,9 @@ export default function SettingsScreen() {
         <SectionLabel label={en.settingsAboutSection} />
         <Card>
           <Text style={{ ...typography.caption, color: colors.textMuted }}>
-            {fill(en.settingsVersion, { version: '1.0.0' })}
+            {Constants.expoConfig?.version
+              ? fill(en.settingsVersion, { version: Constants.expoConfig.version })
+              : en.settingsVersionUnknown}
           </Text>
         </Card>
       </View>

@@ -1,4 +1,5 @@
 import { openDB } from '../client';
+import { SCHEMA_VERSION } from '../schema';
 
 export type CalendarSystem = 'AD' | 'BS';
 
@@ -35,6 +36,9 @@ export interface Settings {
   log_explainer_seen: boolean;
   // §6.2 (M10). Lets a user hide the Home quick-log row.
   quick_log_enabled: boolean;
+  // SPEC: 2026-09-06 (M11) — not in §4.3. UI/UX spec §2.8 colour-blind-friendly scheme.
+  // schema_version stays 1: an absent row falls back to the default like the M10 keys.
+  color_blind_mode: boolean;
 }
 
 export const SETTINGS_DEFAULTS: Settings = {
@@ -50,11 +54,12 @@ export const SETTINGS_DEFAULTS: Settings = {
   notif_fertile_start: false,
   notif_daily_log: false,
   notif_daily_log_time: '20:00',
-  schema_version: 1,
+  schema_version: SCHEMA_VERSION,
   irregular_notice_seen: false,
   onboarding_seed_range: null,
   log_explainer_seen: false,
   quick_log_enabled: true,
+  color_blind_mode: false,
 };
 
 type SettingKey = keyof Settings;
@@ -69,6 +74,7 @@ const BOOLEAN_KEYS = new Set<SettingKey>([
   'irregular_notice_seen',
   'log_explainer_seen',
   'quick_log_enabled',
+  'color_blind_mode',
 ]);
 
 /** Keys stored as JSON. `''` means null — `serialize` already collapses null to empty. */
@@ -135,10 +141,7 @@ export async function getSettings(): Promise<Settings> {
   return result;
 }
 
-export async function setSetting<K extends SettingKey>(
-  key: K,
-  value: Settings[K],
-): Promise<void> {
+export async function setSetting<K extends SettingKey>(key: K, value: Settings[K]): Promise<void> {
   const db = await openDB();
   await db.runAsync(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',

@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import { View, Text, Pressable, type LayoutChangeEvent } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, type LayoutChangeEvent } from 'react-native';
 import type { MonthGrid, MonthCell } from '../../core/calendar';
 import { formatDate } from '../../core/calendar';
 import { dayCellState } from '../../core/home';
 import { colors } from '../../theme/colors';
+import { useColors } from '../../theme/useColors';
 import { en } from '../../i18n/en';
 import { typography } from '../../theme/typography';
 import { MIN_TOUCH_TARGET, spacing } from '../../theme/spacing';
@@ -11,7 +12,6 @@ import type { Period } from '../../core/periods';
 import type { Prediction } from '../../core/prediction';
 import type { LogRow } from '../../db/repositories/dailyLogs';
 import { DayCell } from './DayCell';
-import NepaliDate, { dateConfigMap } from 'nepali-date-converter';
 
 interface MonthGridProps {
   grid: MonthGrid;
@@ -44,7 +44,14 @@ function chunkRows(cells: MonthCell[]): MonthCell[][] {
 }
 
 export function MonthGrid({
-  grid, today, periods, prediction, monthLogs, system, selected = null, onPressDay,
+  grid,
+  today,
+  periods,
+  prediction,
+  monthLogs,
+  system,
+  selected = null,
+  onPressDay,
 }: MonthGridProps) {
   // The columns lay themselves out with `flex: 1`, so they always divide the container into
   // exactly seven regardless of the padding `Screen` puts around us. Only the circle needs a
@@ -55,9 +62,20 @@ export function MonthGrid({
   // SPEC: 2026-09-04 — below ~308pt of usable width seven 44px targets cannot fit at all, so
   // the circle shrinks. Clipping the last column would be the worse failure. Before the first
   // layout pass there is nothing to measure; the §11.4 target is the right guess.
-  const cellSize = rowWidth > 0
-    ? Math.max(1, Math.min(MIN_TOUCH_TARGET, Math.floor(rowWidth / COLUMNS) - 2))
-    : MIN_TOUCH_TARGET;
+  const cellSize =
+    rowWidth > 0
+      ? Math.max(1, Math.min(MIN_TOUCH_TARGET, Math.floor(rowWidth / COLUMNS) - 2))
+      : MIN_TOUCH_TARGET;
+
+  // One bound press handler per cell, rebuilt only when the grid itself or `onPressDay`
+  // changes — not on every render. Without this, `<DayCell onPress={() => onPressDay(iso)}>`
+  // would hand each cell a fresh closure every render and `React.memo(DayCell)` would never
+  // see equal props, so memoizing it would buy nothing.
+  const pressHandlers = useMemo(() => {
+    const map = new Map<string, () => void>();
+    for (const cell of grid.cells) map.set(cell.iso, () => onPressDay(cell.iso));
+    return map;
+  }, [grid, onPressDay]);
 
   return (
     <View>
@@ -96,20 +114,19 @@ export function MonthGrid({
                 periods,
                 prediction,
               });
-              // BS day number: convert AD cell to BS. For fill cells this gives the BS number of the
-              // neighbouring-date, which is correct (§9 — grid is BS, so the corner label must be BS).
-              const bsLabel = (() => {
-                if (system !== 'BS') return undefined;
-                const bs = NepaliDate.fromAD(new Date(cell.iso + 'T12:00:00')).getBS();
-                return bs.date; // the BS day-of-month for this AD date
-              })();
+              // `getMonthGrid` already converted every cell (fill cells included) to its BS
+              // day-of-month when building a BS grid, so `cell.day` is already the right label
+              // — no need to re-run the AD→BS conversion here.
+              const bsLabel = system === 'BS' ? cell.day : undefined;
               // §6.3.1 — a future date is still tappable; the day sheet just renders it
               // read-only. It is dimmed here for the same reason `faded` dims a fill cell: it
               // reads as "not the current focus", not as disabled.
+              // A plain View, not a Pressable: `DayCell` below is the single interactive
+              // element (it owns accessibilityRole/Label/State) — wrapping it in a second
+              // Pressable doubled up the button role and the outer one carried no label.
               return (
-                <Pressable
+                <View
                   key={cell.iso}
-                  onPress={() => onPressDay(cell.iso)}
                   style={{
                     flex: 1,
                     paddingVertical: spacing.xs,
@@ -123,13 +140,13 @@ export function MonthGrid({
                     state={state}
                     isToday={isToday}
                     isSelected={cell.iso === selected}
-                    onPress={() => onPressDay(cell.iso)}
+                    onPress={pressHandlers.get(cell.iso)}
                     label={bsLabel}
                     faded={cell.fill}
                     hideWeekday
                     size={cellSize}
                   />
-                </Pressable>
+                </View>
               );
             })}
           </View>
@@ -142,25 +159,54 @@ export function MonthGrid({
   );
 }
 
+// §4 (A2) — three entries once the §2.8 texture grammar carries logged-vs-predicted:
+// Period (a solid swatch + a dashed one), Fertile window (a wash + the ovulation diamond),
+// Logged (a hollow swatch + the entry dot). Labels from `en`; built from `useColors()` so
+// the colour-blind scheme reaches the swatches.
 function LegendRow() {
-  // §12 rule 6 — labels come from `en`, not literals. Ovulation's swatch is now the same
-  // solid `ovulationFill` the day cell itself uses (§11.2), not a ring on the fertile wash.
-  const items = [
-    { label: en.legendPeriod, color: colors.primary },
-    { label: en.legendPredicted, color: colors.primaryMuted },
-    { label: en.legendFertile, color: colors.fertileMuted },
-    { label: en.legendOvulation, color: colors.ovulationFill },
-    { label: en.legendLogged, color: colors.surface, dot: true },
-  ];
+  const c = useColors();
+  const dot = (extra: object) => (
+    <View style={{ width: 10, height: 10, borderRadius: 5, ...extra }} />
+  );
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingVertical: spacing.md, paddingTop: spacing.sm }}>
-      {items.map((it) => (
-        <View key={it.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: it.color, borderWidth: it.color === colors.surface ? 1 : 0, borderColor: colors.border }} />
-          {it.dot ? <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colors.textMuted }} /> : null}
-          <Text style={{ ...typography.caption, color: colors.textMuted }}>{it.label}</Text>
-        </View>
-      ))}
+    <View
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: spacing.md,
+        paddingVertical: spacing.md,
+        paddingTop: spacing.sm,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        {dot({ backgroundColor: c.periodLogged })}
+        {dot({
+          backgroundColor: c.periodPredicted,
+          borderWidth: 1,
+          borderColor: c.periodPredictedBorder,
+          borderStyle: 'dashed',
+        })}
+        <Text style={{ ...typography.caption, color: c.textMuted }}>{en.legendPeriod}</Text>
+      </View>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        {dot({ backgroundColor: c.fertile })}
+        <View
+          style={{
+            width: 7,
+            height: 7,
+            backgroundColor: c.ovulation,
+            transform: [{ rotate: '45deg' }],
+          }}
+        />
+        <Text style={{ ...typography.caption, color: c.textMuted }}>{en.legendFertile}</Text>
+      </View>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        {dot({ backgroundColor: c.surface, borderWidth: 1, borderColor: c.border })}
+        <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: c.textMuted }} />
+        <Text style={{ ...typography.caption, color: c.textMuted }}>{en.legendLogged}</Text>
+      </View>
     </View>
   );
 }

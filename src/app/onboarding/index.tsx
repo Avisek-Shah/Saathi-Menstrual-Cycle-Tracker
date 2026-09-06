@@ -1,12 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
-import {
-  NativeSyntheticEvent,
-  ScrollView,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { NativeSyntheticEvent, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import type { NativeScrollEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -103,7 +97,9 @@ function NumberAnswerStep({
   return (
     <ScrollView style={pageStyle} contentContainerStyle={{ paddingBottom: spacing.xl }}>
       <Text style={{ ...typography.title, color: colors.text }}>{title}</Text>
-      <Text style={{ ...typography.body, color: colors.textMuted, marginTop: spacing.sm }}>{help}</Text>
+      <Text style={{ ...typography.body, color: colors.textMuted, marginTop: spacing.sm }}>
+        {help}
+      </Text>
 
       <View style={{ marginTop: spacing.xl }}>
         <NumberAnswerField
@@ -146,13 +142,19 @@ export default function Onboarding() {
 
   const [submitting, setSubmitting] = useState(false);
 
-  const today = todayIso();
-  const thisYear = currentYear();
-  const dateChoices = quickDateChoices(today);
-  const yearRange = birthYearRange(thisYear);
-  const yearChoices = birthYearQuickChoices(thisYear);
+  // Lazy init: read once at mount, not on every keystroke — also stops the seed range
+  // shifting if the user crosses midnight mid-flow.
+  const [today] = useState(() => todayIso());
+  const [thisYear] = useState(() => currentYear());
+  const dateChoices = useMemo(() => quickDateChoices(today), [today]);
+  const yearRange = useMemo(() => birthYearRange(thisYear), [thisYear]);
+  const yearChoices = useMemo(() => birthYearQuickChoices(thisYear), [thisYear]);
   const yearMin = yearRange[yearRange.length - 1];
   const yearMax = yearRange[0];
+  const isSelectableStart = useCallback(
+    (iso: string) => isSelectableStartDate(today, iso),
+    [today],
+  );
 
   const cycleLength = parseNumberInput(cycleLengthText, CYCLE_LENGTH_MIN, CYCLE_LENGTH_MAX);
   const periodLength = parseNumberInput(periodLengthText, PERIOD_LENGTH_MIN, PERIOD_LENGTH_MAX);
@@ -198,10 +200,23 @@ export default function Onboarding() {
     }
   };
 
-  const pageStyle: PageStyle = { width, paddingHorizontal: spacing.xl, paddingTop: spacing.xxl };
+  const pageStyle: PageStyle = useMemo(
+    () => ({ width, paddingHorizontal: spacing.xl, paddingTop: spacing.xxl }),
+    [width],
+  );
 
-  const cycleLengthError = numberFieldError(cycleLength.error, CYCLE_LENGTH_MIN, CYCLE_LENGTH_MAX, false);
-  const periodLengthError = numberFieldError(periodLength.error, PERIOD_LENGTH_MIN, PERIOD_LENGTH_MAX, false);
+  const cycleLengthError = numberFieldError(
+    cycleLength.error,
+    CYCLE_LENGTH_MIN,
+    CYCLE_LENGTH_MAX,
+    false,
+  );
+  const periodLengthError = numberFieldError(
+    periodLength.error,
+    PERIOD_LENGTH_MIN,
+    PERIOD_LENGTH_MAX,
+    false,
+  );
   const birthYearError = numberFieldError(birthYear.error, yearMin, yearMax, true);
 
   return (
@@ -215,8 +230,13 @@ export default function Onboarding() {
         contentContainerStyle={{ flexGrow: 1 }}
       >
         {/* 1 — Welcome */}
-        <ScrollView style={pageStyle} contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
-          <Text style={{ ...typography.hero, color: colors.text }}>{en.onboardingWelcomeTitle}</Text>
+        <ScrollView
+          style={pageStyle}
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+        >
+          <Text style={{ ...typography.hero, color: colors.text }}>
+            {en.onboardingWelcomeTitle}
+          </Text>
           <Text style={{ ...typography.body, color: colors.text, marginTop: spacing.lg }}>
             {en.onboardingWelcomeWhat}
           </Text>
@@ -232,7 +252,14 @@ export default function Onboarding() {
             {en.onboardingStartHelp}
           </Text>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.lg }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: spacing.sm,
+              marginTop: spacing.lg,
+            }}
+          >
             {dateChoices.map((choice, i) => (
               <Chip
                 key={choice.iso}
@@ -268,7 +295,7 @@ export default function Onboarding() {
                 system={calendarSystem}
                 today={today}
                 value={notSure ? null : startDate}
-                isSelectable={(iso) => isSelectableStartDate(today, iso)}
+                isSelectable={isSelectableStart}
                 onSelect={(iso) => {
                   setStartDate(iso);
                   setNotSure(false);
@@ -316,7 +343,9 @@ export default function Onboarding() {
 
         {/* 5 — Birth year */}
         <ScrollView style={pageStyle} contentContainerStyle={{ paddingBottom: spacing.xl }}>
-          <Text style={{ ...typography.title, color: colors.text }}>{en.onboardingBirthYearTitle}</Text>
+          <Text style={{ ...typography.title, color: colors.text }}>
+            {en.onboardingBirthYearTitle}
+          </Text>
           <Text style={{ ...typography.body, color: colors.textMuted, marginTop: spacing.sm }}>
             {en.onboardingBirthYearHelp}
           </Text>
@@ -331,7 +360,14 @@ export default function Onboarding() {
               accessibilityLabel={en.onboardingBirthYearTitle}
             />
           </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: spacing.sm,
+              marginTop: spacing.md,
+            }}
+          >
             {yearChoices.map((y) => (
               <Chip
                 key={y}

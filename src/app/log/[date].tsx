@@ -164,13 +164,10 @@ export default function LogModal() {
         <Text style={{ ...typography.cardTitle, color: colors.text }}>
           {format(parseISO(date), 'EEE d MMM')}
         </Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={handleSave}
-          disabled={isFuture}
-          hitSlop={8}
-        >
-          <Text style={{ ...typography.cardTitle, color: isFuture ? colors.textMuted : colors.primary }}>
+        <Pressable accessibilityRole="button" onPress={handleSave} disabled={isFuture} hitSlop={8}>
+          <Text
+            style={{ ...typography.cardTitle, color: isFuture ? colors.textMuted : colors.primary }}
+          >
             {en.save}
           </Text>
         </Pressable>
@@ -182,13 +179,21 @@ export default function LogModal() {
         </View>
       ) : (
         <ScrollView
-          contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xl, gap: spacing.xl }}
+          contentContainerStyle={{
+            padding: spacing.lg,
+            paddingBottom: insets.bottom + spacing.xl,
+            gap: spacing.xl,
+          }}
           keyboardShouldPersistTaps="handled"
           onTouchStart={dismissExplainer}
         >
           {!explainerSeen ? (
-            <Card style={{ backgroundColor: colors.primaryMuted, borderColor: colors.primaryMuted }}>
-              <Text style={{ ...typography.body, color: colors.text }}>{en.logExplainerBody}</Text>
+            <Card
+              style={{ backgroundColor: colors.primaryMuted, borderColor: colors.primaryMuted }}
+            >
+              <Text style={{ ...typography.body, color: colors.onPrimaryMuted }}>
+                {en.logExplainerBody}
+              </Text>
             </Card>
           ) : null}
 
@@ -223,7 +228,9 @@ export default function LogModal() {
           ) : (
             <>
               <View>
-                <Text style={{ ...typography.cardTitle, color: colors.text, marginBottom: spacing.md }}>
+                <Text
+                  style={{ ...typography.cardTitle, color: colors.text, marginBottom: spacing.md }}
+                >
                   {en.logMood}
                 </Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
@@ -239,7 +246,9 @@ export default function LogModal() {
               </View>
 
               <View>
-                <Text style={{ ...typography.cardTitle, color: colors.text, marginBottom: spacing.md }}>
+                <Text
+                  style={{ ...typography.cardTitle, color: colors.text, marginBottom: spacing.md }}
+                >
                   {en.logSymptoms}
                 </Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
@@ -257,7 +266,13 @@ export default function LogModal() {
               <View>
                 {noteOpen ? (
                   <>
-                    <Text style={{ ...typography.cardTitle, color: colors.text, marginBottom: spacing.md }}>
+                    <Text
+                      style={{
+                        ...typography.cardTitle,
+                        color: colors.text,
+                        marginBottom: spacing.md,
+                      }}
+                    >
                       {en.logNote}
                     </Text>
                     <TextInput
@@ -295,7 +310,9 @@ export default function LogModal() {
                     onPress={() => setNoteOpen(true)}
                     style={{ minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' }}
                   >
-                    <Text style={{ ...typography.body, color: colors.primary }}>{en.logAddNote}</Text>
+                    <Text style={{ ...typography.body, color: colors.primary }}>
+                      {en.logAddNote}
+                    </Text>
                   </Pressable>
                 )}
               </View>
@@ -305,7 +322,9 @@ export default function LogModal() {
                 onPress={() => setMoreOpen(false)}
                 style={{ minHeight: MIN_TOUCH_TARGET, justifyContent: 'center' }}
               >
-                <Text style={{ ...typography.caption, color: colors.textMuted }}>{en.logHideMore}</Text>
+                <Text style={{ ...typography.caption, color: colors.textMuted }}>
+                  {en.logHideMore}
+                </Text>
               </Pressable>
             </>
           )}

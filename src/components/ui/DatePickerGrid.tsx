@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import {
@@ -39,10 +39,19 @@ function monthOf(iso: string, system: CalendarSystem): { year: number; month: nu
  * the calendar tab uses (§6.3), so BS re-grids correctly here too. No native picker dependency
  * (§2 — M10 adds none).
  */
-export function DatePickerGrid({ system, today, value, onSelect, isSelectable }: DatePickerGridProps) {
+export function DatePickerGrid({
+  system,
+  today,
+  value,
+  onSelect,
+  isSelectable,
+}: DatePickerGridProps) {
   const [cursor, setCursor] = useState(() => monthOf(value ?? today, system));
 
-  const grid = getMonthGrid(cursor.year, cursor.month, system, today);
+  const grid = useMemo(
+    () => getMonthGrid(cursor.year, cursor.month, system, today),
+    [cursor, system, today],
+  );
 
   return (
     <View>
@@ -72,7 +81,12 @@ export function DatePickerGrid({ system, today, value, onSelect, isSelectable }:
         {WEEKHEAD.map((l, idx) => (
           <Text
             key={l + idx}
-            style={{ ...typography.caption, color: colors.textMuted, width: 36, textAlign: 'center' }}
+            style={{
+              ...typography.caption,
+              color: colors.textMuted,
+              width: 36,
+              textAlign: 'center',
+            }}
           >
             {l}
           </Text>
@@ -112,7 +126,9 @@ export function DatePickerGrid({ system, today, value, onSelect, isSelectable }:
                   borderColor: colors.text,
                 }}
               >
-                <Text style={{ ...typography.caption, color: selected ? colors.surface : colors.text }}>
+                <Text
+                  style={{ ...typography.caption, color: selected ? colors.surface : colors.text }}
+                >
                   {cell.day}
                 </Text>
               </View>
